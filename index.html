@@ -508,7 +508,7 @@
 <div class="bottom-dock">
   <button class="dock-btn primary" onclick="openNearbySheet()">附近廁所</button>
   <button class="dock-btn accent" id="addDockBtn" onclick="toggleAddMode()">＋ 新增廁所</button>
-  <button class="dock-btn" onclick="openToolsSheet()">校區／匯出</button>
+  <button class="dock-btn" onclick="openToolsSheet()">更多／回饋</button>
 </div>
 
 <!-- Universal Bottom Sheet -->
@@ -705,7 +705,10 @@ async function syncFromCloud() {
     const res = await fetch(CLOUD_API_URL + "?action=getAll");
     const data = await res.json();
     if (data.reviews) {
-      Object.entries(data.reviews).forEach(([fid, list]) => { reviewsMap[fid] = list; });
+      Object.entries(data.reviews).forEach(([fid, list]) => {
+        if (fid === "__SITE_FEEDBACK__") return;
+        reviewsMap[fid] = list;
+      });
     }
     if (Array.isArray(data.points)) userPoints = data.points;
     saveLocal();
@@ -1574,6 +1577,56 @@ function flyAndOpenPoint(fid) {
   openPointSheet(fid);
 }
 
+// Website Feedback Sheet (writes directly to Google Sheets under feature_id="__SITE_FEEDBACK__")
+function openFeedbackSheet() {
+  const html = `
+    <div style="font-size:12.5px;color:#475569;margin-bottom:8px;">
+      發現座標偏移、畫面卡頓，或有想要的新功能？歡迎直接留言給開發者，我們會持續改進！
+    </div>
+    <label class="field-label">回饋類型</label>
+    <select id="fbType" class="input-el" style="margin-bottom:8px;">
+      <option value="功能建議">功能建議／許願</option>
+      <option value="問題回報">Bug／操作問題回報</option>
+      <option value="資料勘誤">廁所位置或資料勘誤</option>
+      <option value="使用心得">其他使用心得</option>
+    </select>
+    <label class="field-label">回饋內容 *</label>
+    <textarea id="fbText" class="input-el" rows="3" placeholder="例如：哪一棟點位偏掉了、手機哪個按鈕不好按、希望新增什麼標籤..."></textarea>
+    <label class="field-label">你的稱呼／聯絡方式（選填）</label>
+    <input type="text" id="fbAuthor" class="input-el" placeholder="匿名（若希望回覆可留 IG 或 Email）" />
+    <button class="btn-big btn-rate" id="fbSubmitBtn" style="margin-top:12px;" onclick="submitSiteFeedback()">送出網站回饋</button>
+  `;
+  openSheet("網站意見回饋", html);
+}
+
+function submitSiteFeedback() {
+  const text = document.getElementById("fbText").value.trim();
+  if (!text) { showToast("請先輸入回饋內容喔！"); return; }
+  const btn = document.getElementById("fbSubmitBtn");
+  btn.disabled = true;
+  const fbType = document.getElementById("fbType").value;
+  const author = document.getElementById("fbAuthor").value.trim() || "匿名測試者";
+  const now = new Date();
+  const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+
+  pushToCloud({
+    action: "addReview",
+    feature_id: "__SITE_FEEDBACK__",
+    review: {
+      author,
+      floor: fbType,
+      clean: 5, vent: 5, equip: 5,
+      tags: ["網站回饋", fbType],
+      comment: text,
+      time: timeStr,
+      photo_url: "",
+      photo_source: ""
+    }
+  });
+  closeSheet();
+  showToast("感謝你的寶貴回饋！已送給作者");
+}
+
 // Tools / Campus / Export Sheet
 function openToolsSheet() {
   let totalRev = 0;
@@ -1598,6 +1651,9 @@ function openToolsSheet() {
       <div><span class="c-dot" style="background:#e11d48;width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;"></span>師生共編新增</div>
       <div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;border:2px solid #facc15;margin-right:6px;"></span>金框＝4.5★以上</div>
     </div>
+
+    <span class="field-label">網站測試回饋（Bug 回報／功能建議）</span>
+    <button class="btn-big btn-rate" style="margin-bottom:14px;padding:10px 12px;font-size:13.5px;" onclick="openFeedbackSheet()">我要回饋網站意見／回報問題</button>
 
     <span class="field-label">VGI 資料匯出（拉回 QGIS 分析／備份）</span>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
