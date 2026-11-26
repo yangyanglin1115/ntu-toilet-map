@@ -221,6 +221,25 @@
   .review-photo {
     max-width: 100%; max-height: 140px; object-fit: cover; display: block; cursor: zoom-in;
   }
+  .upload-btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    width: 100%; padding: 10px 12px; border: 1.5px dashed #7c3aed; border-radius: 10px;
+    background: #f5f3ff; color: #5b21b6; font-size: 13px; font-weight: 700;
+    cursor: pointer; margin-top: 6px; text-align: center;
+  }
+  .upload-btn:active { background: #ede9fe; }
+  .upload-preview-wrap {
+    display: none; position: relative; margin-top: 8px; border-radius: 10px;
+    overflow: hidden; border: 1px solid #cbd5e1; background: #0f172a;
+  }
+  .upload-preview-wrap img {
+    width: 100%; max-height: 160px; object-fit: cover; display: block;
+  }
+  .upload-remove-btn {
+    position: absolute; top: 6px; right: 6px; border: none;
+    background: rgba(15,23,42,0.78); color: #fff; width: 26px; height: 26px;
+    border-radius: 50%; font-size: 15px; cursor: pointer;
+  }
   .meta-line { font-size: 13px; color: #334155; margin: 4px 0; }
   .coord-line { font-family: Consolas, monospace; font-size: 11.5px; color: #0f766e; }
 
@@ -616,9 +635,10 @@ function openPointSheet(fid, startInRateMode = false) {
     distBadgeHtml = `<span class="dist-badge">距你約 ${dMeters} m（步行 ~${walkMin} 分）</span>`;
   }
   const photoCredit = p.photo_source || "臺大公開圖資";
-  const photoHtml = p.photo_file
+  const heroSrc = p.photo_url ? p.photo_url : (p.photo_file ? `photos/${p.photo_file}` : "");
+  const photoHtml = heroSrc
     ? `<div class="photo-frame">
-         <img class="hero-photo" src="photos/${p.photo_file}" alt="${escapeHtml(p.name)}" onclick="openLightbox('photos/${p.photo_file}', '${escapeHtml(photoCredit)}')" />
+         <img class="hero-photo" src="${escapeHtml(heroSrc)}" alt="${escapeHtml(p.name)}" onclick="openLightbox('${escapeHtml(heroSrc)}', '${escapeHtml(photoCredit)}')" />
          <span class="photo-credit">來源：${escapeHtml(photoCredit)}</span>
        </div>`
     : '';
@@ -698,14 +718,19 @@ function openPointSheet(fid, startInRateMode = false) {
         </div>
       </details>
 
-      <span class="field-label">3. 補充一句心得（選填）</span>
-      <textarea id="inComment" class="input-el" rows="2" placeholder="例如：3樓最安靜、衛生紙剛補滿、有免治馬桶..."></textarea>
+      <span class="field-label">3. 上傳實景照片（選填，支援手機直接拍照／相簿）</span>
+      <label class="upload-btn">
+        <input type="file" id="inPhotoFile" accept="image/*" style="display:none;" onchange="handlePhotoPick(this, 'rev')" />
+        拍照或從相簿選擇照片
+      </label>
+      <div class="upload-preview-wrap" id="revPhotoPreviewWrap">
+        <img id="revPhotoPreviewImg" src="" alt="上傳預覽" />
+        <button type="button" class="upload-remove-btn" onclick="clearPickedPhoto('rev')">×</button>
+      </div>
+      <input type="text" id="inPhotoSource" class="input-el" style="margin-top:6px;" placeholder="照片來源標註（選填，預設為你的暱稱或「臺大師生實拍」）" />
 
-      <details style="margin:6px 0;">
-        <summary style="font-size:12px;color:#475569;cursor:pointer;font-weight:700;">附實景照片與來源標註（選填）</summary>
-        <input type="text" id="inPhotoUrl" class="input-el" style="margin-top:6px;" placeholder="圖片網址（https://...）" />
-        <input type="text" id="inPhotoSource" class="input-el" style="margin-top:6px;" placeholder="照片來源標註（例：IG @xxx、Threads @xxx、本人實拍）" />
-      </details>
+      <span class="field-label">4. 補充一句心得（選填）</span>
+      <textarea id="inComment" class="input-el" rows="2" placeholder="例如：3樓最安靜、衛生紙剛補滿、有免治馬桶..."></textarea>
 
       <span class="field-label">系級／暱稱（選填）</span>
       <input type="text" id="inAuthor" class="input-el" placeholder="匿名臺大人（例：地理系 B12）" />
@@ -738,6 +763,46 @@ function setStars(val) {
   document.getElementById("inEquip").value = val;
 }
 
+// Client-side Photo Compression (max 900px JPEG ~70-110KB so mobile uploads are fast & free)
+let pickedPhotos = { rev: "", newpt: "" };
+
+function handlePhotoPick(input, slot) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  showToast("正在壓縮處理照片...");
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxW = 900;
+      const scale = img.width > maxW ? (maxW / img.width) : 1;
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.72);
+      pickedPhotos[slot] = dataUrl;
+      const wrap = document.getElementById(slot + "PhotoPreviewWrap");
+      const preview = document.getElementById(slot + "PhotoPreviewImg");
+      if (wrap && preview) {
+        preview.src = dataUrl;
+        wrap.style.display = "block";
+      }
+      showToast("照片已就緒！");
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearPickedPhoto(slot) {
+  pickedPhotos[slot] = "";
+  const wrap = document.getElementById(slot + "PhotoPreviewWrap");
+  if (wrap) wrap.style.display = "none";
+}
+
 function submitReview(fid) {
   const btn = document.getElementById("submitRevBtn");
   btn.disabled = true;
@@ -746,27 +811,33 @@ function submitReview(fid) {
   const equip = Number(document.getElementById("inEquip").value);
   const comment = document.getElementById("inComment").value.trim();
   const author = document.getElementById("inAuthor").value.trim() || "匿名臺大人";
-  const photo_url = (document.getElementById("inPhotoUrl")?.value || "").trim();
-  const photo_source = (document.getElementById("inPhotoSource")?.value || "").trim();
+  const photo_data = pickedPhotos.rev || "";
+  const photo_source = (document.getElementById("inPhotoSource")?.value || "").trim() || (author !== "匿名臺大人" ? `${author} 實拍` : "臺大師生實拍");
   const tags = Array.from(document.querySelectorAll("#tagGrid .tag-opt.selected")).map(el => el.dataset.tag);
 
   const now = new Date();
   const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   const rec = {
     author, clean, vent, equip, tags,
-    photo_url, photo_source,
-    comment: comment || (tags.length ? tags.join("、") : `${Math.round((clean+vent+equip)/3)}★ 評分`),
+    photo_url: photo_data,
+    photo_source: photo_data ? photo_source : "",
+    comment: comment || (tags.length ? tags.join("、") : (photo_data ? "分享實景照片" : `${Math.round((clean+vent+equip)/3)}★ 評分`)),
     time: timeStr
   };
 
   if (!reviewsMap[fid]) reviewsMap[fid] = [];
   reviewsMap[fid].push(rec);
+  pickedPhotos.rev = "";
   saveLocal();
-  pushToCloud({ action: "addReview", feature_id: fid, review: rec });
+  pushToCloud({
+    action: "addReview",
+    feature_id: fid,
+    review: Object.assign({}, rec, { photo_base64: photo_data, photo_url: "" })
+  });
 
   renderPoints();
   openPointSheet(fid, false);
-  showToast("感謝貢獻！你的評分已更新到地圖");
+  showToast("感謝貢獻！你的評分與照片已更新到地圖");
 }
 
 // Live GPS Tracking (Google Maps Blue Pulsing Dot + Accuracy Circle)
@@ -922,6 +993,7 @@ map.on("click", (e) => {
 });
 
 function openAddPointSheet(lat, lon) {
+  pickedPhotos.newpt = "";
   const html = `
     <div class="coord-line" style="margin-bottom:8px;">已選座標（WGS84）：${lat.toFixed(5)}, ${lon.toFixed(5)}</div>
     <label class="field-label">館舍與廁所名稱 *</label>
@@ -935,6 +1007,15 @@ function openAddPointSheet(lat, lon) {
     </select>
     <label class="field-label">樓層與特色說明</label>
     <textarea id="newDesc" class="input-el" rows="2" placeholder="例如：4樓電梯旁，有免治馬桶、很安靜"></textarea>
+    <label class="field-label">上傳實景照片（選填）</label>
+    <label class="upload-btn">
+      <input type="file" accept="image/*" style="display:none;" onchange="handlePhotoPick(this, 'newpt')" />
+      拍照或從相簿選擇照片
+    </label>
+    <div class="upload-preview-wrap" id="newptPhotoPreviewWrap">
+      <img id="newptPhotoPreviewImg" src="" alt="上傳預覽" />
+      <button type="button" class="upload-remove-btn" onclick="clearPickedPhoto('newpt')">×</button>
+    </div>
     <label class="field-label">你的系級／暱稱（選填）</label>
     <input type="text" id="newAuthor" class="input-el" placeholder="匿名臺大人" />
     <button class="btn-big btn-rate" style="margin-top:12px;" onclick="submitNewPoint(${lat}, ${lon})">送出並標記到地圖</button>
@@ -948,6 +1029,8 @@ function submitNewPoint(lat, lon) {
   const category = document.getElementById("newCat").value;
   const description = document.getElementById("newDesc").value.trim();
   const author = document.getElementById("newAuthor").value.trim() || "匿名臺大人";
+  const photo_data = pickedPhotos.newpt || "";
+  const photo_source = photo_data ? (author !== "匿名臺大人" ? `${author} 實拍` : "臺大師生實拍") : "";
   const fid = "vgi_" + Date.now();
 
   const newFeat = {
@@ -957,12 +1040,18 @@ function submitNewPoint(lat, lon) {
       feature_id: fid, category, campus: "參與式新增", name,
       description: `${description}（由 ${author} 共編新增）`,
       is_24h: description.includes("24小時") || description.includes("24H") ? "是" : "否",
-      source: "PPGIS_User", photo_file: ""
+      source: "PPGIS_User", photo_file: "",
+      photo_url: photo_data, photo_source
     }
   };
   userPoints.push(newFeat);
+  pickedPhotos.newpt = "";
   saveLocal();
-  pushToCloud({ action: "addPoint", feature: newFeat });
+  pushToCloud({
+    action: "addPoint",
+    feature: newFeat,
+    photo_base64: photo_data
+  });
   toggleAddMode(false);
   renderPoints();
   openPointSheet(fid);
