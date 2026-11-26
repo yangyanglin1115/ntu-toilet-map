@@ -284,6 +284,21 @@
   .input-el:focus { border-color: var(--violet); }
   .sub-score-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 6px; }
 
+  .floor-pill {
+    display: inline-block; font-size: 10.5px; font-weight: 700;
+    padding: 1px 7px; border-radius: 999px; margin-left: 5px;
+  }
+  .floor-1f { background: #dcfce7; color: #166534; }
+  .floor-other { background: #e0e7ff; color: #3730a3; }
+  .floor-tabs {
+    display: flex; gap: 6px; margin: 8px 0 6px 0;
+  }
+  .floor-tab {
+    flex: 1; padding: 6px 8px; border-radius: 8px; border: 1px solid #cbd5e1;
+    background: #fff; color: #334155; font-size: 12px; font-weight: 700; cursor: pointer;
+  }
+  .floor-tab.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+
   /* Review List */
   .review-item { border-top: 1px solid #e2e8f0; padding: 9px 0; }
   .review-head { display: flex; justify-content: space-between; font-size: 12px; color: #64748b; }
@@ -438,10 +453,18 @@ const CATEGORY_META = {
 };
 
 const DEFAULT_REVIEWS = {
-  "map_restroom_103_88": [{ author: "社群彙整", clean: 5, vent: 5, equip: 4, tags: ["空間寬敞", "安靜乾淨", "有衛生紙"], comment: "總圖 1F 廁所寬敞明亮、清潔頻率高，期中期末考季人較多。", time: "2026-11" }],
-  "map_restroom_39_43":  [{ author: "社群彙整", clean: 5, vent: 5, equip: 5, tags: ["有免治馬桶", "安靜乾淨"], comment: "社科院與霖澤館周邊硬體新穎、安靜舒適，部分樓層配有免治馬桶。", time: "2026-11" }],
-  "map_restroom_32_107": [{ author: "社群彙整", clean: 5, vent: 5, equip: 5, tags: ["有免治馬桶", "安靜乾淨"], comment: "霖澤館廁所維護佳，空間乾淨無異味。", time: "2026-11" }]
+  "map_restroom_103_88": [{ author: "社群彙整", floor: "1F", clean: 5, vent: 5, equip: 4, tags: ["空間寬敞", "安靜乾淨", "有衛生紙"], comment: "總圖 1F 廁所寬敞明亮、清潔頻率高，期中期末考季人較多。", time: "2026-11" }],
+  "map_restroom_39_43":  [{ author: "社群彙整", floor: "4F", clean: 5, vent: 5, equip: 5, tags: ["有免治馬桶", "安靜乾淨"], comment: "社科院高樓層與霖澤館周邊硬體新穎、安靜舒適，部分樓層配有免治馬桶。", time: "2026-11" }],
+  "map_restroom_32_107": [{ author: "社群彙整", floor: "1F", clean: 5, vent: 5, equip: 5, tags: ["有免治馬桶", "安靜乾淨"], comment: "霖澤館廁所維護佳，空間乾淨無異味。", time: "2026-11" }]
 };
+
+// 將使用者輸入的精確樓層（B2~6F+）歸類為前台顯示的「一樓」或「一樓以外」
+function getFloorGroup(floorStr) {
+  const f = String(floorStr || "").trim().toUpperCase();
+  if (!f || f === "不確定") return "";
+  if (f === "1F" || f === "1" || f === "1樓" || f === "一樓") return "一樓";
+  return "一樓以外";
+}
 
 const LS_REVIEWS_KEY = "ntu_ppgis_reviews_v1";
 const LS_POINTS_KEY  = "ntu_ppgis_newpoints_v1";
@@ -749,14 +772,30 @@ function copyDirectLink(fid) {
 }
 
 // Point Detail + 5-Second Quick Rating Sheet
-function openPointSheet(fid, startInRateMode = false) {
+let sheetFloorFilter = "all";
+function openPointSheet(fid, startInRateMode = false, floorFilter = "all") {
+  sheetFloorFilter = floorFilter;
   const feat = getAllFeatures().find(f => f.properties.feature_id === fid);
   if (!feat) return;
   const p = feat.properties;
   const [lon, lat] = feat.geometry.coordinates;
   const meta = CATEGORY_META[p.category] || { color: "#475569" };
   const st = getStats(fid);
-  const reviews = reviewsMap[fid] || [];
+  const allReviews = reviewsMap[fid] || [];
+  const reviews = floorFilter === "all"
+    ? allReviews
+    : allReviews.filter(r => getFloorGroup(r.floor) === floorFilter);
+
+  // 分別計算「一樓」與「一樓以外」的平均評分
+  const rev1F = allReviews.filter(r => getFloorGroup(r.floor) === "一樓");
+  const revOther = allReviews.filter(r => getFloorGroup(r.floor) === "一樓以外");
+  const avgOf = arr => arr.length ? (arr.reduce((s, r) => s + ((+r.clean)+(+r.vent)+(+r.equip))/3, 0) / arr.length).toFixed(1) : null;
+  const floorCompareHtml = (rev1F.length || revOther.length)
+    ? `<div style="font-size:11.5px;color:#475569;margin-top:5px;display:flex;gap:10px;flex-wrap:wrap;">
+         ${rev1F.length ? `<span><span class="floor-pill floor-1f" style="margin-left:0;">一樓</span> ★${avgOf(rev1F)} (${rev1F.length})</span>` : ''}
+         ${revOther.length ? `<span><span class="floor-pill floor-other" style="margin-left:0;">一樓以外</span> ★${avgOf(revOther)} (${revOther.length})</span>` : ''}
+       </div>`
+    : '';
 
   map.panTo([lat, lon]);
 
@@ -792,16 +831,29 @@ function openPointSheet(fid, startInRateMode = false) {
     `<span class="tag-opt" onclick="this.classList.toggle('selected')" data-tag="${t}">${t}</span>`
   ).join("");
 
-  const reviewsHtml = reviews.length > 0
-    ? `<div style="margin-top:12px;"><div style="font-size:12.5px;font-weight:800;color:#475569;margin-bottom:4px;">師生評論（${reviews.length}）</div>
-       ${reviews.slice().reverse().map(r => {
+  const floorTabsHtml = allReviews.length > 0
+    ? `<div class="floor-tabs">
+         <button class="floor-tab ${floorFilter==='all'?'active':''}" onclick="openPointSheet('${fid}', false, 'all')">全部 (${allReviews.length})</button>
+         <button class="floor-tab ${floorFilter==='一樓'?'active':''}" onclick="openPointSheet('${fid}', false, '一樓')">一樓 (${rev1F.length})</button>
+         <button class="floor-tab ${floorFilter==='一樓以外'?'active':''}" onclick="openPointSheet('${fid}', false, '一樓以外')">一樓以外 (${revOther.length})</button>
+       </div>`
+    : '';
+
+  const reviewsHtml = allReviews.length > 0
+    ? `<div style="margin-top:12px;"><div style="font-size:12.5px;font-weight:800;color:#475569;margin-bottom:4px;">師生評論（${allReviews.length}）</div>
+       ${floorTabsHtml}
+       ${reviews.length === 0 ? '<div style="font-size:12px;color:#64748b;padding:8px 0;">此樓層分類尚無評論。</div>' : reviews.slice().reverse().map(r => {
          const rPhotoCredit = r.photo_source || r.author || "網友提供";
          const rPhotoHtml = r.photo_url
            ? `<div class="review-photo-frame"><img class="review-photo" src="${escapeHtml(r.photo_url)}" alt="評論照片" onclick="openLightbox('${escapeHtml(r.photo_url)}', '${escapeHtml(rPhotoCredit)}')" /><span class="photo-credit">來源：${escapeHtml(rPhotoCredit)}</span></div>`
            : "";
+         const fGrp = getFloorGroup(r.floor);
+         const floorBadge = fGrp
+           ? `<span class="floor-pill ${fGrp==='一樓'?'floor-1f':'floor-other'}" title="原始填寫：${escapeHtml(r.floor)}">${fGrp}</span>`
+           : "";
          return `
          <div class="review-item">
-           <div class="review-head"><strong>${escapeHtml(r.author || "匿名臺大人")}</strong><span>★ ${(((+r.clean)+(+r.vent)+(+r.equip))/3).toFixed(1)}｜${escapeHtml(r.time || "")}</span></div>
+           <div class="review-head"><div><strong>${escapeHtml(r.author || "匿名臺大人")}</strong>${floorBadge}</div><span>★ ${(((+r.clean)+(+r.vent)+(+r.equip))/3).toFixed(1)}｜${escapeHtml(r.time || "")}</span></div>
            <div class="review-body">${escapeHtml(r.comment)}</div>
            ${rPhotoHtml}
          </div>`;
@@ -821,6 +873,7 @@ function openPointSheet(fid, startInRateMode = false) {
 
     <div class="rating-summary">
       ${ratingHtml}
+      ${floorCompareHtml}
       ${tagsHtml}
     </div>
 
@@ -830,7 +883,20 @@ function openPointSheet(fid, startInRateMode = false) {
     </div>
 
     <div class="rate-box" id="rateFormBox" style="display:${startInRateMode ? 'block' : 'none'};">
-      <span class="field-label">1. 整體滿意度（點擊星星）</span>
+      <span class="field-label">1. 你使用的是哪一樓？（前台會簡化顯示為「一樓」或「一樓以外」）</span>
+      <select id="inFloor" class="input-el" style="margin-bottom:8px;">
+        <option value="1F" selected>1F（一樓）</option>
+        <option value="B1">B1（地下一樓）</option>
+        <option value="B2">B2（地下二樓）</option>
+        <option value="2F">2F（二樓）</option>
+        <option value="3F">3F（三樓）</option>
+        <option value="4F">4F（四樓）</option>
+        <option value="5F">5F（五樓）</option>
+        <option value="6F以上">6F 以上</option>
+        <option value="不確定">不確定</option>
+      </select>
+
+      <span class="field-label">2. 整體滿意度（點擊星星）</span>
       <div class="star-picker" id="starPicker" data-val="4">
         <button type="button" class="star-btn lit" onclick="setStars(1)">★</button>
         <button type="button" class="star-btn lit" onclick="setStars(2)">★</button>
@@ -939,6 +1005,7 @@ function clearPickedPhoto(slot) {
 function submitReview(fid) {
   const btn = document.getElementById("submitRevBtn");
   btn.disabled = true;
+  const floor = (document.getElementById("inFloor")?.value || "1F").trim();
   const clean = Number(document.getElementById("inClean").value);
   const vent  = Number(document.getElementById("inVent").value);
   const equip = Number(document.getElementById("inEquip").value);
@@ -951,7 +1018,7 @@ function submitReview(fid) {
   const now = new Date();
   const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   const rec = {
-    author, clean, vent, equip, tags,
+    author, floor, clean, vent, equip, tags,
     photo_url: photo_data,
     photo_source: photo_data ? photo_source : "",
     comment: comment || (tags.length ? tags.join("、") : (photo_data ? "分享實景照片" : `${Math.round((clean+vent+equip)/3)}★ 評分`)),
@@ -1138,6 +1205,17 @@ function openAddPointSheet(lat, lon) {
       <option value="無障礙廁所">無障礙廁所</option>
       <option value="公共廁所樞紐">公共廁所樞紐</option>
     </select>
+    <label class="field-label">所在樓層</label>
+    <select id="newFloor" class="input-el">
+      <option value="1F" selected>1F（一樓）</option>
+      <option value="B1">B1（地下一樓）</option>
+      <option value="B2">B2（地下二樓）</option>
+      <option value="2F">2F（二樓）</option>
+      <option value="3F">3F（三樓）</option>
+      <option value="4F">4F（四樓）</option>
+      <option value="5F">5F（五樓）</option>
+      <option value="6F以上">6F 以上</option>
+    </select>
     <label class="field-label">樓層與特色說明</label>
     <textarea id="newDesc" class="input-el" rows="2" placeholder="例如：4樓電梯旁，有免治馬桶、很安靜"></textarea>
     <label class="field-label">上傳實景照片（選填）</label>
@@ -1160,6 +1238,8 @@ function submitNewPoint(lat, lon) {
   const name = document.getElementById("newName").value.trim();
   if (!name) { showToast("請輸入館舍與廁所名稱！"); return; }
   const category = document.getElementById("newCat").value;
+  const floor = document.getElementById("newFloor")?.value || "1F";
+  const floorGrp = getFloorGroup(floor) || "一樓";
   const description = document.getElementById("newDesc").value.trim();
   const author = document.getElementById("newAuthor").value.trim() || "匿名臺大人";
   const photo_data = pickedPhotos.newpt || "";
@@ -1170,8 +1250,8 @@ function submitNewPoint(lat, lon) {
     type: "Feature",
     geometry: { type: "Point", coordinates: [Number(lon.toFixed(6)), Number(lat.toFixed(6))] },
     properties: {
-      feature_id: fid, category, campus: "參與式新增", name,
-      description: `${description}（由 ${author} 共編新增）`,
+      feature_id: fid, category, campus: "參與式新增", name, floor,
+      description: `【${floorGrp}】${description}（由 ${author} 共編新增）`,
       is_24h: description.includes("24小時") || description.includes("24H") ? "是" : "否",
       source: "PPGIS_User", photo_file: "",
       photo_url: photo_data, photo_source
