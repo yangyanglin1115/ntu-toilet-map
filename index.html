@@ -617,8 +617,8 @@ const QUICK_TAGS = [
 const CATEGORY_META = {
   "公共廁所樞紐": { color: "#1d4ed8", radius: 8.5, label: "公共廁所樞紐" },
   "性別友善廁所": { color: "#7c3aed", radius: 8.5, label: "性別友善廁所" },
-  "無障礙廁所":   { color: "#0d9488", radius: 6.5, label: "無障礙廁所" },
-  "一般館舍廁所": { color: "#64748b", radius: 4.5, label: "一般館舍廁所" },
+  "無障礙廁所":   { color: "#0d9488", radius: 7.0, label: "無障礙廁所" },
+  "一般館舍廁所": { color: "#64748b", radius: 5.8, label: "一般館舍廁所" },
   "哺集乳室":     { color: "#d97706", radius: 8.0, label: "哺集乳室" },
   "師生共編點位": { color: "#e11d48", radius: 9.0, label: "師生共編點位" }
 };
@@ -852,6 +852,7 @@ function syncBldgVisibility() {
 map.on("zoomend moveend", syncBldgVisibility);
 
 const toiletsGroup = L.layerGroup().addTo(map);
+let visibleFeaturesCache = [];
 
 function passesFilter(feat) {
   const p = feat.properties || {};
@@ -874,11 +875,20 @@ function passesFilter(feat) {
 
 function renderPoints() {
   toiletsGroup.clearLayers();
+  visibleFeaturesCache = [];
   const all = getAllFeatures();
   let shown = 0;
 
-  all.forEach(feat => {
+  // 先畫小灰點在下層，再畫重要彩色點位在上層，視覺層次更清楚
+  const sorted = all.slice().sort((a, b) => {
+    const oa = a.properties.category === "一般館舍廁所" ? 0 : 1;
+    const ob = b.properties.category === "一般館舍廁所" ? 0 : 1;
+    return oa - ob;
+  });
+
+  sorted.forEach(feat => {
     if (!passesFilter(feat)) return;
+    visibleFeaturesCache.push(feat);
     const p = feat.properties || {};
     const [lon, lat] = feat.geometry.coordinates;
     const st = getStats(p.feature_id);
@@ -886,10 +896,11 @@ function renderPoints() {
 
     const marker = L.circleMarker([lat, lon], {
       renderer: sharedCanvas,
-      radius: st.count > 0 ? meta.radius + 1.2 : meta.radius,
+      interactive: !isTouchDevice,
+      radius: st.count > 0 ? meta.radius + 1.0 : meta.radius,
       fillColor: meta.color,
       color: st.avg >= 4.5 ? "#facc15" : "#ffffff",
-      weight: st.avg >= 4.5 ? 2.6 : 1.8,
+      weight: st.avg >= 4.5 ? 2.6 : 1.7,
       opacity: 1, fillOpacity: 0.92
     });
 
@@ -897,16 +908,63 @@ function renderPoints() {
       const starTip = st.count > 0 ? ` ★${st.avg.toFixed(1)}` : "";
       marker.bindTooltip(`${escapeHtml(p.name || "")}${starTip}`, { direction: "top", offset: [0, -6] });
     }
-    marker.on("click", (e) => {
-      if (addMode) return;
-      L.DomEvent.stopPropagation(e);
-      openPointSheet(p.feature_id);
-    });
     marker.addTo(toiletsGroup);
     shown++;
   });
   document.getElementById("totalBadge").textContent = shown;
 }
+
+// 智慧動態點擊判定：縮小時放寬觸控熱區（小灰點超好按），放大到較大比例尺（zoom >= 17）自動收緊並取螢幕像素最近點，避免誤判重疊！
+map.on("click", (e) => {
+  searchDropdown.style.display = "none";
+  if (addMode) {
+    openAddPointSheet(e.latlng.lat, e.latlng.lng);
+    return;
+  }
+  const z = map.getZoom();
+  // 隨比例尺動態調整判定半徑（px）：放越大判定越精準不重疊
+  const hitRadiusPx = z >= 18 ? 11 : (z === 17 ? 15 : 22);
+  const clickPt = map.latLngToContainerPoint(e.latlng);
+
+  const candidates = [];
+  visibleFeaturesCache.forEach(feat => {
+    const [lon, lat] = feat.geometry.coordinates;
+    const pt = map.latLngToContainerPoint([lat, lon]);
+    const dx = pt.x - clickPt.x;
+    const dy = pt.y - clickPt.y;
+    const pxDist = Math.hypot(dx, dy);
+    const r = (CATEGORY_META[feat.properties.category]?.radius || 6);
+    if (pxDist <= Math.max(hitRadiusPx, r + 4)) {
+      candidates.push({ feat, pxDist });
+    }
+  });
+
+  if (!candidates.length) return;
+  candidates.sort((a, b) => a.pxDist - b.pxDist);
+
+  // 若極近處（8px 內）有多顆幾乎完全重疊的點位，彈出精簡選單避免誤點；否則直接開最近那顆！
+  const overlapped = candidates.filter(c => Math.abs(c.pxDist - candidates[0].pxDist) <= 6 && c.pxDist <= 10);
+  if (overlapped.length > 1) {
+    const pickHtml = overlapped.slice(0, 6).map(c => {
+      const p = c.feat.properties;
+      const meta = CATEGORY_META[p.category] || { color: "#64748b" };
+      const st = getStats(p.feature_id);
+      const starTxt = st.count ? `★ ${st.avg.toFixed(1)}` : "尚無評分";
+      return `
+        <div class="nearby-item" onclick="openPointSheet('${p.feature_id}')">
+          <div>
+            <div style="font-weight:700;color:#1e3a5f;font-size:14px;">${escapeHtml(p.name)}</div>
+            <div style="font-size:12px;color:#64748b;"><span class="c-dot" style="background:${meta.color};width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;"></span>${escapeHtml(p.category)}｜${starTxt}</div>
+          </div>
+          <span style="font-size:12px;color:#7c3aed;font-weight:700;">查看 &rarr;</span>
+        </div>
+      `;
+    }).join("");
+    openSheet("此處有多間相鄰廁所，請選擇", pickHtml);
+  } else {
+    openPointSheet(candidates[0].feat.properties.feature_id);
+  }
+});
 
 // Bottom Sheet Helpers
 function openSheet(title, html, fid = null) {
@@ -1354,11 +1412,6 @@ function markMapCenter() {
   const c = map.getCenter();
   openAddPointSheet(c.lat, c.lng);
 }
-
-map.on("click", (e) => {
-  if (!addMode) return;
-  openAddPointSheet(e.latlng.lat, e.latlng.lng);
-});
 
 function openAddPointSheet(lat, lon) {
   pickedPhotos.newpt = "";
