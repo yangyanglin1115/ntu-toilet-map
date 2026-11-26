@@ -529,24 +529,24 @@ const map = L.map("map", {
 L.control.zoom({ position: "bottomright" }).addTo(map);
 
 const tileOpts = { updateWhenZooming: false, updateWhenIdle: true, keepBuffer: 4 };
-// 預設底圖：CartoDB Voyager（類 Google Maps 清晰路網、綠地與主幹道，但不標雜亂的 7-11／商家圖示）
-const baseNTU = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", Object.assign({
-  attribution: "&copy; OpenStreetMap &copy; CARTO｜臺大官方建物圖資", maxZoom: 20
+// 預設底圖：內政部國土測繪中心 臺灣通用電子地圖（灰階簡約 EMAP01，免費免金鑰、清晰路網與大路標示、無雜亂商家）
+const baseNTU = L.tileLayer("https://wmts.nlsc.gov.tw/wmts/EMAP01/default/GoogleMapsCompatible/{z}/{y}/{x}", Object.assign({
+  attribution: "&copy; 內政部國土測繪中心 (NLSC)｜臺大官方建物圖資", maxZoom: 19
 }, tileOpts)).addTo(map);
-const baseClean = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", Object.assign({
-  attribution: "&copy; CARTO", maxZoom: 20
+const baseNLSCColor = L.tileLayer("https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}", Object.assign({
+  attribution: "&copy; 內政部國土測繪中心 (NLSC)", maxZoom: 19
+}, tileOpts));
+const baseEsriGray = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}", Object.assign({
+  attribution: "&copy; Esri", maxZoom: 19
 }, tileOpts));
 const baseOSM = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", Object.assign({
   attribution: "&copy; OpenStreetMap", maxZoom: 19
-}, tileOpts));
-const baseCarto = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", Object.assign({
-  attribution: "&copy; CARTO", maxZoom: 20
 }, tileOpts));
 const baseSat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", Object.assign({
   attribution: "&copy; Esri", maxZoom: 19
 }, tileOpts));
 L.control.layers(
-  { "臺大校園（清晰路網）": baseNTU, "純白極簡底圖": baseClean, "淺色街道": baseCarto, "OpenStreetMap": baseOSM, "衛星影像": baseSat },
+  { "臺大校園（灰階清晰路網）": baseNTU, "臺灣通用地圖（彩色）": baseNLSCColor, "極簡淺灰底圖": baseEsriGray, "OpenStreetMap": baseOSM, "衛星影像": baseSat },
   null, { position: "topright" }
 ).addTo(map);
 
