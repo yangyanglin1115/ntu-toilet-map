@@ -61,6 +61,22 @@
   .sync-local { background: #e0f2fe; color: #0369a1; }
   .sync-cloud { background: #dcfce7; color: #15803d; }
 
+  .search-dropdown {
+    display: none; pointer-events: auto; margin-top: 6px;
+    background: #ffffff; border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+    border: 1px solid #cbd5e1; overflow: hidden;
+    max-height: 270px; overflow-y: auto;
+  }
+  .search-dd-item {
+    padding: 9px 13px; border-bottom: 1px solid #f1f5f9;
+    cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  }
+  .search-dd-item:last-child { border-bottom: none; }
+  .search-dd-item:hover, .search-dd-item:active { background: #f8fafc; }
+  .search-dd-name { font-size: 13.5px; font-weight: 700; color: #1e3a5f; }
+  .search-dd-sub { font-size: 11.5px; color: #64748b; }
+
   .chips-scroll {
     pointer-events: auto;
     display: flex; gap: 6px; overflow-x: auto; padding: 8px 2px 4px 2px;
@@ -396,10 +412,10 @@
 <div class="top-bar">
   <div class="search-wrap">
     <div class="brand-dot">NTU</div>
-    <input type="text" id="searchInput" class="search-input" placeholder="搜館舍或標籤（地理系、總圖、免治...）" />
+    <input type="text" id="searchInput" class="search-input" placeholder="搜館舍或標籤（地理系、總圖、免治...）" autocomplete="off" />
     <button class="clear-btn" id="clearSearchBtn" onclick="clearSearch()">×</button>
-    <span id="syncPill" class="sync-pill sync-local">本機模式</span>
   </div>
+  <div class="search-dropdown" id="searchDropdown"></div>
   <div class="chips-scroll" id="chipsScroll">
     <button class="chip chip-rank" onclick="openLeaderboardSheet('top')">🏆 好評榜</button>
     <button class="chip active" data-filter="all" onclick="toggleQuickChip(this, 'all')">全部 (<span id="totalBadge">0</span>)</button>
@@ -536,11 +552,9 @@ function getStats(fid) {
 }
 
 // Cloud Sync
+let cloudSyncStatus = CLOUD_API_URL ? "雲端共編連線中" : "本機測試模式";
 async function syncFromCloud() {
   if (!CLOUD_API_URL) return;
-  const pill = document.getElementById("syncPill");
-  pill.textContent = "同步中...";
-  pill.className = "sync-pill sync-cloud";
   try {
     const res = await fetch(CLOUD_API_URL + "?action=getAll");
     const data = await res.json();
@@ -549,12 +563,11 @@ async function syncFromCloud() {
     }
     if (Array.isArray(data.points)) userPoints = data.points;
     saveLocal();
-    pill.textContent = "雲端共編";
+    cloudSyncStatus = "雲端共編已連線";
     renderPoints();
     if (currentSheetFid) openPointSheet(currentSheetFid);
   } catch (e) {
-    pill.textContent = "本機模式";
-    pill.className = "sync-pill sync-local";
+    cloudSyncStatus = "暫時離線（本機快取）";
   }
 }
 
@@ -1386,12 +1399,19 @@ function openToolsSheet() {
     </div>
 
     <span class="field-label">VGI 資料匯出（拉回 QGIS 分析／備份）</span>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
       <button class="btn-sub" onclick="exportVGI('geojson')">匯出 GeoJSON</button>
       <button class="btn-sub" onclick="exportVGI('csv')">匯出 CSV</button>
     </div>
+
+    <div style="padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:11.5px;color:#475569;line-height:1.55;">
+      <strong style="color:#1e3a5f;">共編須知與資料說明</strong><br/>
+      1. 本站整合臺大總務處、臺大性平會公開圖資及師生參與式共編資料，僅供校園生活參考。<br/>
+      2. 評分與留言請保持理性友善；上傳實景照時<strong>請勿拍攝他人或涉及隱私畫面</strong>，並尊重照片原創者來源標註。<br/>
+      <span style="color:#64748b;">同步狀態：${cloudSyncStatus}</span>
+    </div>
   `;
-  openSheet("校區跳轉・圖例・資料匯出", html);
+  openSheet("校區跳轉・圖例・關於本站", html);
 }
 
 function flyCampus(which) {
@@ -1449,15 +1469,60 @@ function toggleBuildings() {
 }
 
 const searchInput = document.getElementById("searchInput");
+const searchDropdown = document.getElementById("searchDropdown");
+
+function renderSearchDropdown() {
+  if (!searchQuery) {
+    searchDropdown.style.display = "none";
+    searchDropdown.innerHTML = "";
+    return;
+  }
+  const matches = getAllFeatures().filter(feat => passesFilter(feat)).slice(0, 6);
+  if (!matches.length) {
+    searchDropdown.innerHTML = '<div style="padding:10px 13px;font-size:12.5px;color:#64748b;">找不到符合的館舍或標籤</div>';
+    searchDropdown.style.display = "block";
+    return;
+  }
+  searchDropdown.innerHTML = matches.map(feat => {
+    const p = feat.properties;
+    const st = getStats(p.feature_id);
+    const starTxt = st.count ? `★ ${st.avg.toFixed(1)}` : p.category;
+    return `
+      <div class="search-dd-item" onclick="pickSearchResult('${p.feature_id}')">
+        <div style="min-width:0;">
+          <div class="search-dd-name">${escapeHtml(p.name)}</div>
+          <div class="search-dd-sub">${escapeHtml(p.campus || "")}｜${escapeHtml(p.category)}</div>
+        </div>
+        <span style="font-size:12px;font-weight:700;color:#d97706;white-space:nowrap;">${starTxt}</span>
+      </div>
+    `;
+  }).join("");
+  searchDropdown.style.display = "block";
+}
+
+function pickSearchResult(fid) {
+  searchDropdown.style.display = "none";
+  flyAndOpenPoint(fid);
+}
+
 searchInput.addEventListener("input", () => {
   searchQuery = searchInput.value.trim().toLowerCase();
   document.getElementById("clearSearchBtn").style.display = searchQuery ? "inline-flex" : "none";
   renderPoints();
+  renderSearchDropdown();
 });
+searchInput.addEventListener("focus", () => {
+  if (searchQuery) renderSearchDropdown();
+});
+map.on("click", () => {
+  searchDropdown.style.display = "none";
+});
+
 function clearSearch() {
   searchInput.value = "";
   searchQuery = "";
   document.getElementById("clearSearchBtn").style.display = "none";
+  searchDropdown.style.display = "none";
   renderPoints();
 }
 
