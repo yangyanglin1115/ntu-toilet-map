@@ -1269,6 +1269,19 @@ function submitReview(fid) {
     time: timeStr
   };
 
+  if (photo_data) {
+    // 含照片者改先送後台審核，不直接寫入本機公開畫面，並給予友善提示
+    pickedPhotos.rev = "";
+    pushToCloud({
+      action: "addReview",
+      feature_id: fid,
+      review: Object.assign({}, rec, { photo_base64: photo_data, photo_url: "" })
+    });
+    openPointSheet(fid, false);
+    showToast("已送出！含照片的評論將於確認無隱私疑慮後公開顯示");
+    return;
+  }
+
   if (!reviewsMap[fid]) reviewsMap[fid] = [];
   reviewsMap[fid].push(rec);
   pickedPhotos.rev = "";
@@ -1276,12 +1289,12 @@ function submitReview(fid) {
   pushToCloud({
     action: "addReview",
     feature_id: fid,
-    review: Object.assign({}, rec, { photo_base64: photo_data, photo_url: "" })
+    review: Object.assign({}, rec, { photo_base64: "", photo_url: "" })
   });
 
   renderPoints();
   openPointSheet(fid, false);
-  showToast("感謝貢獻！你的評分與照片已更新到地圖");
+  showToast("感謝貢獻！你的評分已更新到地圖");
 }
 
 // Live GPS Tracking (Google Maps Blue Pulsing Dot + Accuracy Circle)
