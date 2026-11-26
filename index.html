@@ -296,6 +296,11 @@
     cursor: pointer; margin-top: 6px; text-align: center;
   }
   .upload-btn:active { background: #ede9fe; }
+  .upload-notice {
+    margin-top: 6px; padding: 6px 9px; border-radius: 8px;
+    background: #fffbeb; border: 1px solid #fcd34d;
+    color: #92400e; font-size: 11px; line-height: 1.45;
+  }
   .upload-preview-wrap {
     display: none; position: relative; margin-top: 8px; border-radius: 10px;
     overflow: hidden; border: 1px solid #cbd5e1; background: #0f172a;
@@ -1157,6 +1162,7 @@ function openPointSheet(fid, startInRateMode = false, floorFilter = "all") {
         <input type="file" id="inPhotoFile" accept="image/*" style="display:none;" onchange="handlePhotoPick(this, 'rev')" />
         拍照或從相簿選擇照片
       </label>
+      <div class="upload-notice">提醒：請僅拍攝無人使用時的環境空景（如入口、洗手台、設備），<strong>嚴禁拍攝他人、偷拍或任何侵犯隱私之畫面</strong>。</div>
       <div class="upload-preview-wrap" id="revPhotoPreviewWrap">
         <img id="revPhotoPreviewImg" src="" alt="上傳預覽" />
         <button type="button" class="upload-remove-btn" onclick="clearPickedPhoto('rev')">×</button>
@@ -1453,6 +1459,7 @@ function openAddPointSheet(lat, lon) {
       <input type="file" accept="image/*" style="display:none;" onchange="handlePhotoPick(this, 'newpt')" />
       拍照或從相簿選擇照片
     </label>
+    <div class="upload-notice">提醒：請僅拍攝無人使用時的環境空景（如入口、洗手台、設備），<strong>嚴禁拍攝他人、偷拍或任何侵犯隱私之畫面</strong>。</div>
     <div class="upload-preview-wrap" id="newptPhotoPreviewWrap">
       <img id="newptPhotoPreviewImg" src="" alt="上傳預覽" />
       <button type="button" class="upload-remove-btn" onclick="clearPickedPhoto('newpt')">×</button>
