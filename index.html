@@ -77,6 +77,58 @@
   .search-dd-name { font-size: 13.5px; font-weight: 700; color: #1e3a5f; }
   .search-dd-sub { font-size: 11.5px; color: #64748b; }
 
+  .help-btn {
+    border: none; background: #f1f5f9; color: #334155;
+    width: 26px; height: 26px; border-radius: 50%;
+    font-size: 13px; font-weight: 800; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .help-btn:hover { background: #e2e8f0; }
+
+  /* First-visit Illustrated Guide Modal */
+  .guide-bg {
+    display: none; position: fixed; inset: 0; z-index: 2300;
+    background: rgba(15, 23, 42, 0.56);
+    justify-content: center; align-items: center; padding: 16px;
+  }
+  .guide-card {
+    background: #ffffff; border-radius: 18px; width: 100%; max-width: 390px;
+    max-height: 88vh; overflow-y: auto;
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.32);
+    overflow: hidden;
+  }
+  .guide-head {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2d5a88 60%, #6d28d9 100%);
+    color: #fff; padding: 16px 18px 14px 18px;
+    display: flex; justify-content: space-between; align-items: flex-start;
+  }
+  .guide-head h2 { margin: 0; font-size: 17px; letter-spacing: 0.3px; }
+  .guide-head p { margin: 3px 0 0 0; font-size: 12px; color: #dbeafe; }
+  .guide-close {
+    border: none; background: rgba(255,255,255,0.2); color: #fff;
+    width: 28px; height: 28px; border-radius: 50%; font-size: 16px; cursor: pointer;
+  }
+  .guide-body { padding: 14px 16px 16px 16px; }
+  .guide-step {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px; border: 1px solid #e2e8f0; border-radius: 12px;
+    background: #f8fafc; margin-bottom: 10px;
+  }
+  .guide-illus {
+    width: 68px; height: 56px; border-radius: 10px; flex-shrink: 0;
+    background: #ffffff; border: 1px solid #dbe4ef;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .guide-step-title { font-size: 13.5px; font-weight: 800; color: #1e3a5f; margin-bottom: 2px; }
+  .guide-step-desc { font-size: 12px; color: #475569; line-height: 1.4; }
+  .guide-footer {
+    display: flex; flex-direction: column; gap: 8px; margin-top: 6px;
+  }
+  .guide-check {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    font-size: 12px; color: #64748b; cursor: pointer;
+  }
+
   .chips-scroll {
     pointer-events: auto;
     display: flex; gap: 6px; overflow-x: auto; padding: 8px 2px 4px 2px;
@@ -414,6 +466,7 @@
     <div class="brand-dot">NTU</div>
     <input type="text" id="searchInput" class="search-input" placeholder="搜館舍或標籤（地理系、總圖、免治...）" autocomplete="off" />
     <button class="clear-btn" id="clearSearchBtn" onclick="clearSearch()">×</button>
+    <button class="help-btn" onclick="openGuideModal()" title="操作說明">?</button>
   </div>
   <div class="search-dropdown" id="searchDropdown"></div>
   <div class="chips-scroll" id="chipsScroll">
@@ -465,6 +518,83 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- 3-Step Illustrated Welcome Guide Modal -->
+<div class="guide-bg" id="guideModal" onclick="if(event.target===this) closeGuideModal()">
+  <div class="guide-card">
+    <div class="guide-head">
+      <div>
+        <h2>歡迎使用臺大廁所地圖</h2>
+        <p>3 個小步驟，一起共編最好用的校園如廁指南</p>
+      </div>
+      <button class="guide-close" onclick="closeGuideModal()">×</button>
+    </div>
+    <div class="guide-body">
+      <div class="guide-step">
+        <div class="guide-illus">
+          <svg width="58" height="46" viewBox="0 0 58 46" fill="none">
+            <rect x="4" y="4" width="50" height="12" rx="6" fill="#eff6ff" stroke="#2563eb" stroke-width="1.3"/>
+            <circle cx="11" cy="10" r="3" fill="#1d4ed8"/>
+            <rect x="17" y="8.5" width="24" height="3" rx="1.5" fill="#93c5fd"/>
+            <rect x="4" y="21" width="23" height="10" rx="5" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.2"/>
+            <text x="15.5" y="28.5" text-anchor="middle" font-size="6.5" font-weight="700" fill="#92400e">好評榜</text>
+            <circle cx="38" cy="27" r="4.5" fill="#7c3aed" stroke="#fff" stroke-width="1.5"/>
+            <circle cx="49" cy="34" r="4" fill="#0d9488" stroke="#fff" stroke-width="1.5"/>
+            <circle cx="28" cy="38" r="4" fill="#1d4ed8" stroke="#fff" stroke-width="1.5"/>
+          </svg>
+        </div>
+        <div>
+          <div class="guide-step-title">1. 搜館舍、看 🏆 好評榜</div>
+          <div class="guide-step-desc">輸入館名或點「好評榜」找高分與免治馬桶；點地圖圓點可看實景照與一樓／樓上評價。</div>
+        </div>
+      </div>
+
+      <div class="guide-step">
+        <div class="guide-illus">
+          <svg width="58" height="46" viewBox="0 0 58 46" fill="none">
+            <text x="29" y="16" text-anchor="middle" font-size="11" fill="#f59e0b">★★★★★</text>
+            <rect x="5" y="22" width="22" height="9" rx="4.5" fill="#7c3aed"/>
+            <text x="16" y="28.5" text-anchor="middle" font-size="6" fill="#fff">免治</text>
+            <rect x="30" y="22" width="23" height="9" rx="4.5" fill="#dcfce7" stroke="#16a34a" stroke-width="0.9"/>
+            <text x="41.5" y="28.5" text-anchor="middle" font-size="6" fill="#166534">一樓</text>
+            <rect x="14" y="34" width="30" height="9" rx="4.5" fill="#f5f3ff" stroke="#7c3aed" stroke-dasharray="2 1.5"/>
+            <text x="29" y="40.5" text-anchor="middle" font-size="6" fill="#5b21b6">拍照上傳</text>
+          </svg>
+        </div>
+        <div>
+          <div class="guide-step-title">2. 10 秒快評與拍照分享</div>
+          <div class="guide-step-desc">點「我要評分」選樓層、星星與快速標籤即可送出，也歡迎用手機拍實景照（勿拍到他人）。</div>
+        </div>
+      </div>
+
+      <div class="guide-step">
+        <div class="guide-illus">
+          <svg width="58" height="46" viewBox="0 0 58 46" fill="none">
+            <circle cx="19" cy="18" r="11" fill="#dbeafe"/>
+            <circle cx="19" cy="18" r="4.5" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+            <rect x="33" y="8" width="21" height="11" rx="5.5" fill="#0d9488"/>
+            <text x="43.5" y="15.5" text-anchor="middle" font-size="6" fill="#fff">附近</text>
+            <rect x="33" y="24" width="21" height="11" rx="5.5" fill="#7c3aed"/>
+            <text x="43.5" y="31.5" text-anchor="middle" font-size="6" fill="#fff">＋新增</text>
+          </svg>
+        </div>
+        <div>
+          <div class="guide-step-title">3. 即時定位＆新增隱藏廁所</div>
+          <div class="guide-step-desc">點「附近廁所」或右下 🎯 找離你最近的廁所；發現漏掉的好廁所也能點「＋新增」標上去！</div>
+        </div>
+      </div>
+
+      <div class="guide-footer">
+        <button class="btn-big btn-rate" onclick="closeGuideModal()">開始探索地圖</button>
+        <label class="guide-check">
+          <input type="checkbox" id="guideDontShow" checked />
+          下次開啟不再自動顯示（可隨時點右上「?」重看）
+        </label>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="lightbox" onclick="this.style.display='none'">
   <div class="lightbox-inner">
     <img id="lightboxImg" src="" alt="照片放大" />
@@ -1526,6 +1656,18 @@ function clearSearch() {
   renderPoints();
 }
 
+// First-visit Illustrated Guide Modal
+const LS_GUIDE_KEY = "ntu_ppgis_guide_seen_v1";
+function openGuideModal() {
+  document.getElementById("guideModal").style.display = "flex";
+}
+function closeGuideModal() {
+  if (document.getElementById("guideDontShow")?.checked) {
+    localStorage.setItem(LS_GUIDE_KEY, "1");
+  }
+  document.getElementById("guideModal").style.display = "none";
+}
+
 // Init + Handle Deep Links (?id=... or ?q=...)
 renderPoints();
 syncFromCloud();
@@ -1539,6 +1681,8 @@ if (params.get("q")) {
 }
 if (params.get("id")) {
   setTimeout(() => openPointSheet(params.get("id")), 300);
+} else if (!localStorage.getItem(LS_GUIDE_KEY)) {
+  setTimeout(() => openGuideModal(), 350);
 }
 </script>
 </body>
