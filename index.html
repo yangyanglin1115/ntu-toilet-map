@@ -327,6 +327,18 @@
     background: rgba(30, 58, 95, 0.9); color: #fff; border: none;
     border-radius: 4px; padding: 2px 6px; font-size: 11px;
   }
+  .ntu-label {
+    pointer-events: none; white-space: nowrap; text-align: center;
+    font-size: 11px; font-weight: 700; color: #1e3a5f;
+    text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 0 0 4px #fff;
+    transform: translate(-50%, -50%);
+  }
+  .ntu-road-label {
+    pointer-events: none; white-space: nowrap; text-align: center;
+    font-size: 11.5px; font-weight: 800; color: #0f766e; letter-spacing: 2px;
+    text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
+    transform: translate(-50%, -50%);
+  }
   .leaflet-control-layers { margin-top: 106px !important; }
   @media (min-width: 768px) {
     .leaflet-control-layers { margin-top: 14px !important; }
@@ -517,9 +529,13 @@ const map = L.map("map", {
 L.control.zoom({ position: "bottomright" }).addTo(map);
 
 const tileOpts = { updateWhenZooming: false, updateWhenIdle: true, keepBuffer: 4 };
+// 預設底圖：極簡無雜訊底圖（搭配臺大官方 301 棟建物與校園地標標註，畫面最乾淨）
+const baseNTU = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", Object.assign({
+  attribution: "&copy; OpenStreetMap &copy; CARTO｜臺大官方建物圖資", maxZoom: 20
+}, tileOpts)).addTo(map);
 const baseOSM = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", Object.assign({
   attribution: "&copy; OpenStreetMap", maxZoom: 19
-}, tileOpts)).addTo(map);
+}, tileOpts));
 const baseCarto = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", Object.assign({
   attribution: "&copy; CARTO", maxZoom: 20
 }, tileOpts));
@@ -527,15 +543,54 @@ const baseSat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/service
   attribution: "&copy; Esri", maxZoom: 19
 }, tileOpts));
 L.control.layers(
-  { "街道地圖": baseOSM, "極簡淺色": baseCarto, "衛星影像": baseSat },
+  { "臺大校園專屬（極簡）": baseNTU, "極簡街道": baseCarto, "OpenStreetMap": baseOSM, "衛星影像": baseSat },
   null, { position: "topright" }
 ).addTo(map);
+
+// 臺大校園核心地標與主幹道標註（簡潔不雜亂，zoom >= 15 顯示）
+const NTU_LANDMARKS = [
+  { name: "椰林大道", lat: 25.01730, lon: 121.53700, type: "road" },
+  { name: "小椰林道", lat: 25.01930, lon: 121.53905, type: "road" },
+  { name: "舟山路",   lat: 25.01560, lon: 121.53820, type: "road" },
+  { name: "醉月湖",   lat: 25.02035, lon: 121.53735, type: "road" },
+  { name: "總圖書館", lat: 25.01755, lon: 121.54090 },
+  { name: "第一活動中心（活大）", lat: 25.01805, lon: 121.54015 },
+  { name: "綜合教學館", lat: 25.01835, lon: 121.53930 },
+  { name: "博雅教學館", lat: 25.01895, lon: 121.53665 },
+  { name: "普通教學館", lat: 25.01850, lon: 121.53665 },
+  { name: "新生教學館", lat: 25.01972, lon: 121.53855 },
+  { name: "共同教學館", lat: 25.01585, lon: 121.53740 },
+  { name: "行政大樓", lat: 25.01610, lon: 121.53655 },
+  { name: "文學院",   lat: 25.01795, lon: 121.53675 },
+  { name: "社會科學院", lat: 25.02080, lon: 121.54235 },
+  { name: "霖澤館",   lat: 25.02055, lon: 121.54375 },
+  { name: "管理學院一館", lat: 25.01385, lon: 121.53810 },
+  { name: "第二活動中心／管二", lat: 25.01300, lon: 121.53665 },
+  { name: "綜合體育館（新體）", lat: 25.02165, lon: 121.53520 },
+  { name: "天文數學館", lat: 25.02128, lon: 121.53820 },
+  { name: "地理系館", lat: 25.01500, lon: 121.53850 },
+  { name: "禮賢樓",   lat: 25.01452, lon: 121.53785 },
+  { name: "德田館",   lat: 25.01925, lon: 121.54185 },
+  { name: "工學院綜合大樓", lat: 25.01898, lon: 121.54055 },
+  { name: "水源校區", lat: 25.01390, lon: 121.52905, type: "road" },
+  { name: "醫學院／公衛", lat: 25.04100, lon: 121.52120, type: "road" }
+];
+
+const landmarkLabelsLayer = L.layerGroup();
+NTU_LANDMARKS.forEach(lm => {
+  const cls = lm.type === "road" ? "ntu-road-label" : "ntu-label";
+  L.marker([lm.lat, lm.lon], {
+    interactive: false,
+    icon: L.divIcon({ className: "", html: `<div class="${cls}">${lm.name}</div>`, iconSize: [0, 0] })
+  }).addTo(landmarkLabelsLayer);
+});
+landmarkLabelsLayer.addTo(map);
 
 let bldgUserEnabled = true;
 const buildingsLayer = L.geoJSON(BUILDINGS_DATA, {
   renderer: sharedCanvas,
   interactive: !isTouchDevice,
-  style: { fillColor: "#cbd5e1", fillOpacity: 0.38, color: "#64748b", weight: 0.9 },
+  style: { fillColor: "#dce6f2", fillOpacity: 0.85, color: "#64748b", weight: 1.0 },
   onEachFeature: (feat, layer) => {
     if (!isTouchDevice) {
       const p = feat.properties || {};
@@ -544,11 +599,15 @@ const buildingsLayer = L.geoJSON(BUILDINGS_DATA, {
   }
 }).addTo(map);
 
-// Auto-hide 301 building polygons when zoomed far out (zoom < 15) for extra smoothness
+// Auto-hide 301 building polygons & labels when zoomed far out (zoom < 15) for extra smoothness
 function syncBldgVisibility() {
-  const shouldShow = bldgUserEnabled && map.getZoom() >= 15;
+  const z = map.getZoom();
+  const shouldShow = bldgUserEnabled && z >= 15;
   if (shouldShow && !map.hasLayer(buildingsLayer)) buildingsLayer.addTo(map);
   else if (!shouldShow && map.hasLayer(buildingsLayer)) map.removeLayer(buildingsLayer);
+
+  if (shouldShow && !map.hasLayer(landmarkLabelsLayer)) landmarkLabelsLayer.addTo(map);
+  else if (!shouldShow && map.hasLayer(landmarkLabelsLayer)) map.removeLayer(landmarkLabelsLayer);
 }
 map.on("zoomend", syncBldgVisibility);
 
