@@ -360,6 +360,28 @@
     text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
     transform: translate(-50%, -50%);
   }
+  .chip-rank {
+    background: linear-gradient(135deg, #fffbeb, #fef3c7);
+    color: #92400e; border-color: #f59e0b; font-weight: 800;
+  }
+  .rank-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 11px; border: 1px solid #e2e8f0; border-radius: 12px;
+    margin-bottom: 8px; cursor: pointer; background: #fff;
+  }
+  .rank-item:active { background: #f8fafc; }
+  .rank-num {
+    width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 13px; background: #f1f5f9; color: #475569;
+  }
+  .rank-1 { background: #fef08a; color: #854d0e; border: 1.5px solid #eab308; }
+  .rank-2 { background: #e2e8f0; color: #334155; border: 1.5px solid #94a3b8; }
+  .rank-3 { background: #fed7aa; color: #9a3412; border: 1.5px solid #f97316; }
+  .rank-score {
+    margin-left: auto; text-align: right; flex-shrink: 0;
+  }
+
   .leaflet-control-layers { margin-top: 106px !important; }
   @media (min-width: 768px) {
     .leaflet-control-layers { margin-top: 14px !important; }
@@ -379,6 +401,7 @@
     <span id="syncPill" class="sync-pill sync-local">本機模式</span>
   </div>
   <div class="chips-scroll" id="chipsScroll">
+    <button class="chip chip-rank" onclick="openLeaderboardSheet('top')">🏆 好評榜</button>
     <button class="chip active" data-filter="all" onclick="toggleQuickChip(this, 'all')">全部 (<span id="totalBadge">0</span>)</button>
     <button class="chip" data-filter="cat:公共廁所樞紐" onclick="toggleQuickChip(this, 'cat:公共廁所樞紐')"><span class="c-dot" style="background:#1d4ed8"></span>公共樞紐</button>
     <button class="chip" data-filter="cat:性別友善廁所" onclick="toggleQuickChip(this, 'cat:性別友善廁所')"><span class="c-dot" style="background:#7c3aed"></span>性別友善</button>
@@ -1269,6 +1292,72 @@ function submitNewPoint(lat, lon) {
   renderPoints();
   openPointSheet(fid);
   showToast("已新增到地圖！歡迎接著給它第一個評分");
+}
+
+// Leaderboard Sheet (好評排行榜：綜合 Top 10 / 免治專區 / 最多評論)
+function openLeaderboardSheet(tab = "top") {
+  const enriched = getAllFeatures().map(f => {
+    const p = f.properties;
+    const st = getStats(p.feature_id);
+    return { feat: f, p, st };
+  });
+
+  let list = [];
+  if (tab === "top") {
+    list = enriched.filter(x => x.st.count > 0)
+      .sort((a, b) => (b.st.avg - a.st.avg) || (b.st.count - a.st.count))
+      .slice(0, 10);
+  } else if (tab === "bidet") {
+    list = enriched.filter(x => x.st.tagCounts["有免治馬桶"] > 0)
+      .sort((a, b) => (b.st.tagCounts["有免治馬桶"] - a.st.tagCounts["有免治馬桶"]) || (b.st.avg - a.st.avg))
+      .slice(0, 15);
+  } else {
+    list = enriched.filter(x => x.st.count > 0)
+      .sort((a, b) => (b.st.count - a.st.count) || (b.st.avg - a.st.avg))
+      .slice(0, 10);
+  }
+
+  const tabsHtml = `
+    <div class="floor-tabs" style="margin-top:0;margin-bottom:10px;">
+      <button class="floor-tab ${tab==='top'?'active':''}" onclick="openLeaderboardSheet('top')">綜合 Top 10</button>
+      <button class="floor-tab ${tab==='bidet'?'active':''}" onclick="openLeaderboardSheet('bidet')">免治馬桶</button>
+      <button class="floor-tab ${tab==='hot'?'active':''}" onclick="openLeaderboardSheet('hot')">最多評論</button>
+    </div>
+  `;
+
+  const itemsHtml = list.length === 0
+    ? `<div style="padding:18px 8px;text-align:center;color:#64748b;font-size:13px;">這個分類還沒有上榜資料，快回地圖幫你喜歡的廁所評分吧！</div>`
+    : list.map((item, idx) => {
+        const rank = idx + 1;
+        const rCls = rank === 1 ? "rank-1" : (rank === 2 ? "rank-2" : (rank === 3 ? "rank-3" : ""));
+        const topTags = Object.entries(item.st.tagCounts)
+          .sort((a, b) => b[1] - a[1]).slice(0, 2)
+          .map(([t]) => `<span class="tag-pill" style="font-size:10px;padding:1px 6px;">${escapeHtml(t)}</span>`).join(" ");
+        return `
+          <div class="rank-item" onclick="flyAndOpenPoint('${item.p.feature_id}')">
+            <div class="rank-num ${rCls}">${rank}</div>
+            <div style="min-width:0;flex:1;">
+              <div style="font-weight:800;color:#1e3a5f;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.p.name)}</div>
+              <div style="font-size:11.5px;color:#64748b;margin-top:2px;">${escapeHtml(item.p.category)} ${topTags}</div>
+            </div>
+            <div class="rank-score">
+              <div style="font-weight:800;color:#d97706;font-size:14px;">★ ${item.st.avg.toFixed(1)}</div>
+              <div style="font-size:10.5px;color:#64748b;">${item.st.count} 則</div>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+  const footerHtml = `<div style="margin-top:8px;padding:8px 10px;background:#f8fafc;border-radius:10px;font-size:12px;color:#475569;text-align:center;">沒看到你的私房好廁所？點地圖上的館舍幫它評分上榜！</div>`;
+  openSheet("🏆 臺大廁所好評排行榜", tabsHtml + itemsHtml + footerHtml);
+}
+
+function flyAndOpenPoint(fid) {
+  const feat = getAllFeatures().find(f => f.properties.feature_id === fid);
+  if (!feat) return;
+  const [lon, lat] = feat.geometry.coordinates;
+  map.flyTo([lat, lon], 18);
+  openPointSheet(fid);
 }
 
 // Tools / Campus / Export Sheet
