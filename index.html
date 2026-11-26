@@ -529,10 +529,13 @@ const map = L.map("map", {
 L.control.zoom({ position: "bottomright" }).addTo(map);
 
 const tileOpts = { updateWhenZooming: false, updateWhenIdle: true, keepBuffer: 4 };
-// 預設底圖：極簡無雜訊底圖（搭配臺大官方 301 棟建物與校園地標標註，畫面最乾淨）
-const baseNTU = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", Object.assign({
+// 預設底圖：CartoDB Voyager（類 Google Maps 清晰路網、綠地與主幹道，但不標雜亂的 7-11／商家圖示）
+const baseNTU = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", Object.assign({
   attribution: "&copy; OpenStreetMap &copy; CARTO｜臺大官方建物圖資", maxZoom: 20
 }, tileOpts)).addTo(map);
+const baseClean = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", Object.assign({
+  attribution: "&copy; CARTO", maxZoom: 20
+}, tileOpts));
 const baseOSM = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", Object.assign({
   attribution: "&copy; OpenStreetMap", maxZoom: 19
 }, tileOpts));
@@ -543,12 +546,18 @@ const baseSat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/service
   attribution: "&copy; Esri", maxZoom: 19
 }, tileOpts));
 L.control.layers(
-  { "臺大校園專屬（極簡）": baseNTU, "極簡街道": baseCarto, "OpenStreetMap": baseOSM, "衛星影像": baseSat },
+  { "臺大校園（清晰路網）": baseNTU, "純白極簡底圖": baseClean, "淺色街道": baseCarto, "OpenStreetMap": baseOSM, "衛星影像": baseSat },
   null, { position: "topright" }
 ).addTo(map);
 
-// 臺大校園核心地標與主幹道標註（簡潔不雜亂，zoom >= 15 顯示）
+// 臺大周邊大路、校園主幹道與核心館舍中文標註
 const NTU_LANDMARKS = [
+  { name: "羅斯福路四段", lat: 25.01520, lon: 121.53355, type: "road" },
+  { name: "新生南路三段", lat: 25.01960, lon: 121.53360, type: "road" },
+  { name: "辛亥路二段",   lat: 25.02210, lon: 121.53960, type: "road" },
+  { name: "辛亥路三段",   lat: 25.02050, lon: 121.54530, type: "road" },
+  { name: "基隆路三段",   lat: 25.01690, lon: 121.54420, type: "road" },
+  { name: "基隆路四段",   lat: 25.01320, lon: 121.54030, type: "road" },
   { name: "椰林大道", lat: 25.01730, lon: 121.53700, type: "road" },
   { name: "小椰林道", lat: 25.01930, lon: 121.53905, type: "road" },
   { name: "舟山路",   lat: 25.01560, lon: 121.53820, type: "road" },
@@ -590,7 +599,7 @@ let bldgUserEnabled = true;
 const buildingsLayer = L.geoJSON(BUILDINGS_DATA, {
   renderer: sharedCanvas,
   interactive: !isTouchDevice,
-  style: { fillColor: "#dce6f2", fillOpacity: 0.85, color: "#64748b", weight: 1.0 },
+  style: { fillColor: "#dce6f2", fillOpacity: 0.62, color: "#64748b", weight: 1.0 },
   onEachFeature: (feat, layer) => {
     if (!isTouchDevice) {
       const p = feat.properties || {};
