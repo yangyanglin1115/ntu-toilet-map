@@ -89,6 +89,44 @@
     color: #fff; padding: 3px 10px; border-radius: 999px; font-size: 12px; cursor: pointer;
   }
 
+  /* Floating GPS Locate Button (Google Maps Style, bottom-right above zoom) */
+  .gps-fab {
+    position: fixed; right: 12px; bottom: 92px; z-index: 1000;
+    width: 44px; height: 44px; border-radius: 50%;
+    background: var(--bg-glass); backdrop-filter: blur(8px);
+    border: 1px solid rgba(203,213,225,0.95);
+    box-shadow: 0 4px 14px rgba(15,23,42,0.2);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    color: #334155; transition: all 0.18s;
+  }
+  .gps-fab.tracking {
+    background: #2563eb; color: #ffffff; border-color: #1d4ed8;
+    box-shadow: 0 4px 16px rgba(37,99,235,0.45);
+  }
+  .gps-fab:active { transform: scale(0.93); }
+
+  /* Pulsing Blue User Location Dot */
+  .user-dot-wrap { position: relative; width: 20px; height: 20px; }
+  .user-dot-pulse {
+    position: absolute; inset: -6px; border-radius: 50%;
+    background: rgba(37, 99, 235, 0.28);
+    animation: gpsPulse 2s ease-out infinite;
+  }
+  .user-dot-core {
+    position: absolute; inset: 2px; border-radius: 50%;
+    background: #2563eb; border: 3px solid #ffffff;
+    box-shadow: 0 1px 6px rgba(15,23,42,0.4);
+  }
+  @keyframes gpsPulse {
+    0%   { transform: scale(0.6); opacity: 0.9; }
+    100% { transform: scale(2.1); opacity: 0; }
+  }
+  .dist-badge {
+    display: inline-block; background: #ccfbf1; color: #0f766e;
+    font-size: 11.5px; font-weight: 700; padding: 2px 8px;
+    border-radius: 999px; margin-top: 4px;
+  }
+
   /* Bottom Navigation / Action Bar (Thumb Zone) */
   .bottom-dock {
     position: fixed; bottom: max(12px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
@@ -303,10 +341,19 @@
 
 <!-- Add Mode Banner -->
 <div class="add-banner" id="addBanner">
-  點擊地圖標記廁所位置
-  <button onclick="markMapCenter()">標記畫面中心</button>
+  點擊地圖標記位置
+  <button onclick="markMyGps()">標記我的位置</button>
+  <button onclick="markMapCenter()">畫面中心</button>
   <button onclick="toggleAddMode(false)">取消</button>
 </div>
+
+<!-- Google Maps Style Floating GPS Locate Button -->
+<button class="gps-fab" id="gpsFab" onclick="toggleGpsTracking()" title="即時 GPS 定位（顯示我的位置）" aria-label="即時 GPS 定位">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="4"></circle>
+    <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
+  </svg>
+</button>
 
 <!-- Bottom Thumb-Zone Dock -->
 <div class="bottom-dock">
@@ -562,6 +609,12 @@ function openPointSheet(fid, startInRateMode = false) {
   map.panTo([lat, lon]);
 
   const badge24 = p.is_24h === "是" ? '<span class="badge badge-24h">24H 開放</span>' : '';
+  let distBadgeHtml = '';
+  if (lastUserPos) {
+    const dMeters = Math.round(map.distance([lastUserPos.lat, lastUserPos.lon], [lat, lon]));
+    const walkMin = Math.max(1, Math.round(dMeters / 75));
+    distBadgeHtml = `<span class="dist-badge">距你約 ${dMeters} m（步行 ~${walkMin} 分）</span>`;
+  }
   const photoCredit = p.photo_source || "臺大公開圖資";
   const photoHtml = p.photo_file
     ? `<div class="photo-frame">
@@ -606,6 +659,7 @@ function openPointSheet(fid, startInRateMode = false) {
     <div>
       <span class="badge" style="background:${meta.color}">${escapeHtml(p.category)}</span>
       ${badge24}
+      ${distBadgeHtml}
       <button class="btn-sub" style="float:right;padding:4px 9px;font-size:11.5px;" onclick="copyDirectLink('${fid}')">分享連結</button>
     </div>
     <div class="meta-line" style="margin-top:8px;">${escapeHtml(p.description || "無額外樓層說明")}</div>
@@ -715,39 +769,134 @@ function submitReview(fid) {
   showToast("感謝貢獻！你的評分已更新到地圖");
 }
 
-// Nearby Restrooms Sheet (Mobile GPS 1-Tap)
+// Live GPS Tracking (Google Maps Blue Pulsing Dot + Accuracy Circle)
 let userMarker = null;
+let userAccuracyCircle = null;
+let gpsWatchId = null;
+let lastUserPos = null;
+let hasCenteredOnGps = false;
+
+const userDotIcon = L.divIcon({
+  className: "",
+  html: '<div class="user-dot-wrap"><div class="user-dot-pulse"></div><div class="user-dot-core"></div></div>',
+  iconSize: [20, 20],
+  iconAnchor: [10, 10]
+});
+
+function updateUserLocationOnMap(lat, lon, accuracy, flyToUser = false) {
+  lastUserPos = { lat, lon, accuracy };
+  if (!userMarker) {
+    userMarker = L.marker([lat, lon], { icon: userDotIcon, zIndexOffset: 1000 }).addTo(map).bindTooltip("你的目前位置");
+  } else {
+    userMarker.setLatLng([lat, lon]);
+  }
+  if (!userAccuracyCircle) {
+    userAccuracyCircle = L.circle([lat, lon], {
+      radius: Math.min(accuracy || 25, 120),
+      color: "#2563eb", fillColor: "#3b82f6", fillOpacity: 0.14, weight: 1
+    }).addTo(map);
+  } else {
+    userAccuracyCircle.setLatLng([lat, lon]);
+    userAccuracyCircle.setRadius(Math.min(accuracy || 25, 120));
+  }
+  if (flyToUser) {
+    map.flyTo([lat, lon], Math.max(map.getZoom(), 17));
+  }
+}
+
+function toggleGpsTracking() {
+  if (!navigator.geolocation) { showToast("此瀏覽器不支援 GPS 定位"); return; }
+  const fab = document.getElementById("gpsFab");
+
+  if (gpsWatchId !== null) {
+    // Already tracking: re-center on user; long-turn off if already centered close by
+    if (lastUserPos) {
+      map.flyTo([lastUserPos.lat, lastUserPos.lon], 17);
+      showToast(`已定位至目前位置（誤差約 ${Math.round(lastUserPos.accuracy || 15)} m）`);
+    }
+    return;
+  }
+
+  fab.classList.add("tracking");
+  hasCenteredOnGps = false;
+  showToast("正在開啟即時 GPS 定位...");
+
+  gpsWatchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      const { latitude, longitude, accuracy } = pos.coords;
+      const shouldFly = !hasCenteredOnGps;
+      hasCenteredOnGps = true;
+      updateUserLocationOnMap(latitude, longitude, accuracy, shouldFly);
+    },
+    (err) => {
+      fab.classList.remove("tracking");
+      if (gpsWatchId !== null) {
+        navigator.geolocation.clearWatch(gpsWatchId);
+        gpsWatchId = null;
+      }
+      showToast("無法取得定位，請允許瀏覽器存取位置權限");
+    },
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+  );
+}
+
+function markMyGps() {
+  if (lastUserPos) {
+    openAddPointSheet(lastUserPos.lat, lastUserPos.lon);
+    return;
+  }
+  if (!navigator.geolocation) { showToast("此瀏覽器不支援 GPS 定位"); return; }
+  showToast("正在抓取你的 GPS 座標...");
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      updateUserLocationOnMap(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true);
+      openAddPointSheet(pos.coords.latitude, pos.coords.longitude);
+    },
+    () => showToast("無法取得定位，請改點地圖或「畫面中心」"),
+    { enableHighAccuracy: true, timeout: 12000 }
+  );
+}
+
+// Nearby Restrooms Sheet (Mobile GPS 1-Tap)
+function renderNearbyList(uLat, uLon) {
+  const ranked = getAllFeatures().map(f => {
+    const [lon, lat] = f.geometry.coordinates;
+    return { feat: f, dist: map.distance([uLat, uLon], [lat, lon]) };
+  }).sort((a, b) => a.dist - b.dist).slice(0, 5);
+
+  const listHtml = ranked.map(item => {
+    const p = item.feat.properties;
+    const st = getStats(p.feature_id);
+    const starTxt = st.count ? `★ ${st.avg.toFixed(1)}` : "尚無評分";
+    const walkMin = Math.max(1, Math.round(item.dist / 75));
+    return `
+      <div class="nearby-item" onclick="openPointSheet('${p.feature_id}')">
+        <div>
+          <div style="font-weight:700;color:#1e3a5f;font-size:14px;">${escapeHtml(p.name)}</div>
+          <div style="font-size:12px;color:#64748b;">${escapeHtml(p.category)}｜${starTxt}｜步行 ~${walkMin} 分</div>
+        </div>
+        <span class="dist-pill">${Math.round(item.dist)} m</span>
+      </div>
+    `;
+  }).join("");
+
+  openSheet("離你最近的 5 間廁所", `<div style="font-size:12.5px;color:#475569;margin-bottom:10px;">點選任一間即可導航或 10 秒快評：</div>` + listHtml);
+}
+
 function openNearbySheet() {
+  if (lastUserPos) {
+    map.flyTo([lastUserPos.lat, lastUserPos.lon], 17);
+    renderNearbyList(lastUserPos.lat, lastUserPos.lon);
+    return;
+  }
   if (!navigator.geolocation) { showToast("此瀏覽器不支援 GPS 定位"); return; }
   showToast("正在定位並計算最近廁所...");
   navigator.geolocation.getCurrentPosition((pos) => {
-    const uLat = pos.coords.latitude, uLon = pos.coords.longitude;
-    if (userMarker) map.removeLayer(userMarker);
-    userMarker = L.circleMarker([uLat, uLon], { radius: 8, fillColor: "#ef4444", color: "#fff", weight: 2.5, fillOpacity: 1 }).addTo(map).bindTooltip("你的位置");
-    map.setView([uLat, uLon], 17);
-
-    const ranked = getAllFeatures().map(f => {
-      const [lon, lat] = f.geometry.coordinates;
-      return { feat: f, dist: map.distance([uLat, uLon], [lat, lon]) };
-    }).sort((a, b) => a.dist - b.dist).slice(0, 5);
-
-    const listHtml = ranked.map(item => {
-      const p = item.feat.properties;
-      const st = getStats(p.feature_id);
-      const starTxt = st.count ? `★ ${st.avg.toFixed(1)}` : "尚無評分";
-      return `
-        <div class="nearby-item" onclick="openPointSheet('${p.feature_id}')">
-          <div>
-            <div style="font-weight:700;color:#1e3a5f;font-size:14px;">${escapeHtml(p.name)}</div>
-            <div style="font-size:12px;color:#64748b;">${escapeHtml(p.category)}｜${starTxt}</div>
-          </div>
-          <span class="dist-pill">${Math.round(item.dist)} m</span>
-        </div>
-      `;
-    }).join("");
-
-    openSheet("離你最近的 5 間廁所", `<div style="font-size:12.5px;color:#475569;margin-bottom:10px;">點選任一間即可查看路線或直接 10 秒評分：</div>` + listHtml);
-  }, () => showToast("無法取得定位，請允許瀏覽器位置權限"));
+    const { latitude, longitude, accuracy } = pos.coords;
+    updateUserLocationOnMap(latitude, longitude, accuracy, true);
+    document.getElementById("gpsFab").classList.add("tracking");
+    renderNearbyList(latitude, longitude);
+  }, () => showToast("無法取得定位，請允許瀏覽器位置權限"), { enableHighAccuracy: true, timeout: 12000 });
 }
 
 // Add New Point Mode (Participatory Mapping)
