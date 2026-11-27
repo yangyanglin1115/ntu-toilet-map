@@ -469,7 +469,7 @@
 <div class="top-bar">
   <div class="search-wrap">
     <div class="brand-dot">NTU</div>
-    <input type="text" id="searchInput" class="search-input" placeholder="搜館舍或標籤（社科圖、總圖、免治...）" autocomplete="off" />
+    <input type="text" id="searchInput" class="search-input" placeholder="搜館舍或標籤（地理系、總圖、免治...）" autocomplete="off" />
     <button class="clear-btn" id="clearSearchBtn" onclick="clearSearch()">×</button>
     <button class="help-btn" onclick="openGuideModal()" title="操作說明">?</button>
   </div>
@@ -530,7 +530,7 @@
     <div class="guide-head">
       <div>
         <h2>歡迎使用臺大廁所地圖</h2>
-        <p>3 個小步驟，一起做出最好的台大廁所地圖</p>
+        <p>3 個小步驟，一起共編最好用的校園如廁指南</p>
       </div>
       <button class="guide-close" onclick="closeGuideModal()">×</button>
     </div>
@@ -614,8 +614,8 @@ const ALL_BLDG_LABELS = [{"name":"鹿鳴堂","lat":25.01511,"lon":121.5376},{"na
 const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbzmDTzAYkOBV8GkmLGWXlmk2u6OKZgIkBAGSK6j3kyjDbB4Bn7rCAF0JoSTL7nW7oK1Gg/exec";
 
 const QUICK_TAGS = [
-  "有免治馬桶", "有衛生紙", "衛生紙沒了", "有掛鉤/置物架",
-  "有洗手乳", "安靜乾淨", "空間寬敞", "潮濕/異味", "下課易排隊", "需門禁卡"
+  "有免治馬桶", "有消毒/坐墊紙", "有衛生棉", "有衛生紙", "衛生紙沒了",
+  "有掛鉤/置物架", "有洗手乳", "安靜乾淨", "空間寬敞", "潮濕/異味", "下課易排隊", "需門禁卡"
 ];
 
 const CATEGORY_META = {
@@ -1150,6 +1150,10 @@ function openPointSheet(fid, startInRateMode = false, floorFilter = "all") {
 
       <span class="field-label">2. 快速標籤（點選即可，不打字也能送出）</span>
       <div class="tag-grid" id="tagGrid">${tagOptsHtml}</div>
+      <div style="display:flex;gap:6px;margin:-4px 0 10px 0;">
+        <input type="text" id="inCustomTag" class="input-el" style="padding:7px 10px;font-size:12.5px;" maxlength="10" placeholder="自訂標籤（如：有烘手機、有大鏡子，限10字）" onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomTag();}" />
+        <button type="button" class="btn-sub" style="white-space:nowrap;padding:7px 11px;" onclick="addCustomTag()">＋加入</button>
+      </div>
 
       <details style="margin-bottom:8px;">
         <summary style="font-size:12px;color:#475569;cursor:pointer;font-weight:700;">展開細項評分（整潔／通風／設備，選填）</summary>
@@ -1192,6 +1196,33 @@ function toggleRateForm() {
   const open = box.style.display === "none";
   box.style.display = open ? "block" : "none";
   if (open) box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function addCustomTag() {
+  const input = document.getElementById("inCustomTag");
+  if (!input) return;
+  const val = input.value.replace(/[|\r\n]/g, "").trim().slice(0, 10);
+  if (!val) return;
+  const grid = document.getElementById("tagGrid");
+  const existing = Array.from(grid.querySelectorAll(".tag-opt")).find(el => el.dataset.tag === val);
+  if (existing) {
+    existing.classList.add("selected");
+    input.value = "";
+    return;
+  }
+  const customCount = grid.querySelectorAll(".tag-opt[data-custom='1']").length;
+  if (customCount >= 3) {
+    showToast("單則評論最多可自訂 3 個標籤喔！");
+    return;
+  }
+  const span = document.createElement("span");
+  span.className = "tag-opt selected";
+  span.dataset.tag = val;
+  span.dataset.custom = "1";
+  span.textContent = val;
+  span.onclick = () => span.classList.toggle("selected");
+  grid.appendChild(span);
+  input.value = "";
 }
 
 function setStars(val) {
