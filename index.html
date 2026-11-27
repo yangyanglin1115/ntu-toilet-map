@@ -1479,6 +1479,11 @@ function submitReview(fid) {
 }
 
 // Live GPS Tracking (Google Maps Blue Pulsing Dot + Accuracy Circle)
+const MAP_BOUNDS_RECT = L.latLngBounds([[24.995, 121.495], [25.060, 121.575]]);
+function isWithinMapBounds(lat, lon) {
+  return MAP_BOUNDS_RECT.contains([lat, lon]);
+}
+
 let userMarker = null;
 let userAccuracyCircle = null;
 let gpsWatchId = null;
@@ -1494,6 +1499,13 @@ const userDotIcon = L.divIcon({
 
 function updateUserLocationOnMap(lat, lon, accuracy, flyToUser = false) {
   lastUserPos = { lat, lon, accuracy };
+  const inBounds = isWithinMapBounds(lat, lon);
+  if (!inBounds) {
+    if (flyToUser) {
+      showToast("你目前位置超出臺大校區地圖範圍，已維持顯示校總區地圖");
+    }
+    return false;
+  }
   if (!userMarker) {
     userMarker = L.marker([lat, lon], { icon: userDotIcon, zIndexOffset: 1000 }).addTo(map).bindTooltip("你的目前位置");
   } else {
@@ -1511,6 +1523,7 @@ function updateUserLocationOnMap(lat, lon, accuracy, flyToUser = false) {
   if (flyToUser) {
     map.flyTo([lat, lon], Math.max(map.getZoom(), 17));
   }
+  return true;
 }
 
 function toggleGpsTracking() {
@@ -1518,8 +1531,12 @@ function toggleGpsTracking() {
   const fab = document.getElementById("gpsFab");
 
   if (gpsWatchId !== null) {
-    // Already tracking: re-center on user; long-turn off if already centered close by
+    // Already tracking: re-center on user if within campus bounds
     if (lastUserPos) {
+      if (!isWithinMapBounds(lastUserPos.lat, lastUserPos.lon)) {
+        showToast("你目前位置超出臺大校區地圖範圍，已維持顯示校總區地圖");
+        return;
+      }
       map.flyTo([lastUserPos.lat, lastUserPos.lon], 17);
       showToast(`已定位至目前位置（誤差約 ${Math.round(lastUserPos.accuracy || 15)} m）`);
     }
@@ -1551,6 +1568,10 @@ function toggleGpsTracking() {
 
 function markMyGps() {
   if (lastUserPos) {
+    if (!isWithinMapBounds(lastUserPos.lat, lastUserPos.lon)) {
+      showToast("你目前位置超出臺大校區地圖範圍，請改點地圖或「畫面中心」標記");
+      return;
+    }
     openAddPointSheet(lastUserPos.lat, lastUserPos.lon);
     return;
   }
@@ -1558,7 +1579,11 @@ function markMyGps() {
   showToast("正在抓取你的 GPS 座標...");
   navigator.geolocation.getCurrentPosition(
     (pos) => {
-      updateUserLocationOnMap(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true);
+      const ok = updateUserLocationOnMap(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true);
+      if (!ok) {
+        showToast("你目前位置超出臺大校區地圖範圍，請改點地圖或「畫面中心」標記");
+        return;
+      }
       openAddPointSheet(pos.coords.latitude, pos.coords.longitude);
     },
     () => showToast("無法取得定位，請改點地圖或「畫面中心」"),
@@ -1568,6 +1593,7 @@ function markMyGps() {
 
 // Nearby Restrooms Sheet (Mobile GPS 1-Tap)
 function renderNearbyList(uLat, uLon) {
+  const inBounds = isWithinMapBounds(uLat, uLon);
   const ranked = getAllFeatures().map(f => {
     const [lon, lat] = f.geometry.coordinates;
     return { feat: f, dist: map.distance([uLat, uLon], [lat, lon]) };
@@ -1578,23 +1604,33 @@ function renderNearbyList(uLat, uLon) {
     const st = getStats(p.feature_id);
     const starTxt = st.count ? `★ ${st.avg.toFixed(1)}` : "尚無評分";
     const walkMin = Math.max(1, Math.round(item.dist / 75));
+    const distLabel = item.dist >= 1000 ? `${(item.dist / 1000).toFixed(1)} km` : `${Math.round(item.dist)} m`;
+    const walkLabel = item.dist >= 3000 ? "" : `｜步行 ~${walkMin} 分`;
     return `
       <div class="nearby-item" onclick="openPointSheet('${p.feature_id}')">
         <div>
           <div style="font-weight:700;color:#1e3a5f;font-size:14px;">${escapeHtml(p.name)}</div>
-          <div style="font-size:12px;color:#64748b;">${escapeHtml(p.category)}｜${starTxt}｜步行 ~${walkMin} 分</div>
+          <div style="font-size:12px;color:#64748b;">${escapeHtml(p.category)}｜${starTxt}${walkLabel}</div>
         </div>
-        <span class="dist-pill">${Math.round(item.dist)} m</span>
+        <span class="dist-pill">${distLabel}</span>
       </div>
     `;
   }).join("");
 
-  openSheet("離你最近的 5 間廁所", `<div style="font-size:12.5px;color:#475569;margin-bottom:10px;">點選任一間即可導航或評分：</div>` + listHtml);
+  const outBanner = !inBounds
+    ? `<div style="background:#fef3c7;border:1px solid #fcd34d;color:#92400e;border-radius:10px;padding:8px 10px;font-size:12px;margin-bottom:10px;line-height:1.45;">⚠️ 你目前位置超出臺大校區地圖範圍，以下僅依直線距離列出最近的 5 間校內廁所。</div>`
+    : `<div style="font-size:12.5px;color:#475569;margin-bottom:10px;">點選任一間即可導航或評分：</div>`;
+
+  openSheet("離你最近的 5 間廁所", outBanner + listHtml);
 }
 
 function openNearbySheet() {
   if (lastUserPos) {
-    map.flyTo([lastUserPos.lat, lastUserPos.lon], 17);
+    if (isWithinMapBounds(lastUserPos.lat, lastUserPos.lon)) {
+      map.flyTo([lastUserPos.lat, lastUserPos.lon], 17);
+    } else {
+      showToast("你目前位置超出臺大校區地圖範圍，已維持顯示校總區地圖");
+    }
     renderNearbyList(lastUserPos.lat, lastUserPos.lon);
     return;
   }
@@ -1602,8 +1638,8 @@ function openNearbySheet() {
   showToast("正在定位並計算最近廁所...");
   navigator.geolocation.getCurrentPosition((pos) => {
     const { latitude, longitude, accuracy } = pos.coords;
-    updateUserLocationOnMap(latitude, longitude, accuracy, true);
-    document.getElementById("gpsFab").classList.add("tracking");
+    const ok = updateUserLocationOnMap(latitude, longitude, accuracy, true);
+    if (ok) document.getElementById("gpsFab").classList.add("tracking");
     renderNearbyList(latitude, longitude);
   }, () => showToast("無法取得定位，請允許瀏覽器位置權限"), { enableHighAccuracy: true, timeout: 12000 });
 }
