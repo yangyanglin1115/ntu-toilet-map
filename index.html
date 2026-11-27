@@ -496,8 +496,40 @@
   }
 
   .leaflet-control-layers { margin-top: 106px !important; }
+  .leaflet-bottom.leaflet-left {
+    margin-bottom: 66px !important;
+    margin-left: 6px !important;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    pointer-events: none;
+  }
+  .north-arrow-box {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(148, 163, 184, 0.75);
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.14);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 !important;
+  }
+  .leaflet-control-scale {
+    margin: 0 !important;
+  }
+  .leaflet-control-scale-line {
+    background: rgba(255, 255, 255, 0.92) !important;
+    border: 1.5px solid #334155 !important;
+    border-top: none !important;
+    color: #1e293b !important;
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+    padding: 1px 6px 2px !important;
+    border-radius: 0 0 4px 4px;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+  }
   @media (min-width: 768px) {
     .leaflet-control-layers { margin-top: 14px !important; }
+    .leaflet-bottom.leaflet-left { margin-bottom: 12px !important; margin-left: 10px !important; }
   }
 </style>
 </head>
@@ -801,6 +833,23 @@ const map = L.map("map", {
   tapTolerance: 15
 }).setView([25.0174, 121.5396], 16);
 L.control.zoom({ position: "bottomright" }).addTo(map);
+
+// 地圖學標準要素：指北針（North Arrow）與動態公制比例尺（Scale Bar）
+const NorthArrowControl = L.Control.extend({
+  options: { position: "bottomleft" },
+  onAdd: function() {
+    const div = L.DomUtil.create("div", "north-arrow-box");
+    div.title = "正北方向（North）";
+    div.innerHTML = `<svg width="24" height="24" viewBox="0 0 28 28" fill="none" aria-label="指北針">
+      <text x="14" y="7.5" text-anchor="middle" font-size="7.5" font-weight="900" fill="#1e3a5f" font-family="system-ui,sans-serif">N</text>
+      <polygon points="14,9 18.5,24 14,20.5" fill="#1e3a5f"/>
+      <polygon points="14,9 9.5,24 14,20.5" fill="#94a3b8"/>
+    </svg>`;
+    return div;
+  }
+});
+new NorthArrowControl().addTo(map);
+L.control.scale({ position: "bottomleft", imperial: false, metric: true, maxWidth: 105 }).addTo(map);
 
 // 明確固定圖層 Z-Index 順序：底圖(200) < 建物輪廓(360) < 建物與道路文字(420) < 廁所點位(480) < GPS定位(600)
 map.createPane("buildingsPane");
