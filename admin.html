@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>臺大廁所地圖 — 管理後台</title>
+<style>
+  :root {
+    --bg: #f1f5f9;
+    --card: #ffffff;
+    --navy: #0f172a;
+    --primary: #0d9488;
+    --violet: #7c3aed;
+    --amber: #d97706;
+    --red: #dc2626;
+    --border: #e2e8f0;
+    --muted: #64748b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: "Microsoft JhengHei", "PingFang TC", system-ui, sans-serif;
+    background: var(--bg); color: #1e293b; min-height: 100vh;
+  }
+  /* Login Screen */
+  .login-wrap {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+  }
+  .login-card {
+    background: #fff; width: 100%; max-width: 390px; border-radius: 18px;
+    padding: 28px 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+  }
+  .login-card h1 { margin: 0 0 6px; font-size: 20px; color: var(--navy); }
+  .login-card p { margin: 0 0 18px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .input-el {
+    width: 100%; padding: 11px 13px; border: 1.5px solid #cbd5e1; border-radius: 10px;
+    font-size: 14px; font-family: inherit; outline: none; background: #fff;
+  }
+  .input-el:focus { border-color: var(--primary); }
+  .btn {
+    border: none; border-radius: 10px; padding: 10px 16px; font-size: 13.5px;
+    font-weight: 700; cursor: pointer; font-family: inherit; display: inline-flex;
+    align-items: center; justify-content: center; gap: 6px; text-decoration: none;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { filter: brightness(0.95); }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-ghost { background: #e2e8f0; color: #334155; }
+  .btn-outline { background: #fff; color: #334155; border: 1px solid #cbd5e1; }
+  .btn-sm { padding: 6px 11px; font-size: 12px; border-radius: 8px; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* App Shell */
+  .app { display: none; }
+  .topbar {
+    background: var(--navy); color: #fff; padding: 14px 18px;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    position: sticky; top: 0; z-index: 50; box-shadow: 0 2px 10px rgba(15,23,42,0.2);
+  }
+  .topbar-title { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+  .topbar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .top-link {
+    background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 8px; padding: 6px 11px; font-size: 12px; font-weight: 700;
+    cursor: pointer; text-decoration: none;
+  }
+  .top-link:hover { background: rgba(255,255,255,0.2); }
+
+  .container { max-width: 1020px; margin: 0 auto; padding: 18px 14px 60px; }
+
+  /* Upgrade Notice Banner */
+  .warn-banner {
+    display: none; background: #fef3c7; border: 1px solid #f59e0b; color: #92400e;
+    border-radius: 12px; padding: 12px 14px; font-size: 13px; line-height: 1.55; margin-bottom: 16px;
+  }
+
+  /* KPI Grid */
+  .kpi-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px; margin-bottom: 18px;
+  }
+  .kpi {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 14px 16px; box-shadow: 0 1px 4px rgba(15,23,42,0.04);
+  }
+  .kpi-label { font-size: 12px; color: var(--muted); font-weight: 700; }
+  .kpi-val { font-size: 26px; font-weight: 900; margin-top: 4px; color: var(--navy); }
+  .kpi.alert .kpi-val { color: var(--red); }
+  .kpi.good .kpi-val { color: var(--primary); }
+
+  /* Tabs */
+  .tabs {
+    display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 14px;
+  }
+  .tab-btn {
+    border: 1px solid #cbd5e1; background: #fff; color: #334155;
+    padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 700;
+    cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .tab-btn.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .tab-count {
+    background: #e2e8f0; color: #334155; border-radius: 999px; padding: 1px 7px; font-size: 11px; font-weight: 800;
+  }
+  .tab-btn.active .tab-count { background: rgba(255,255,255,0.22); color: #fff; }
+  .tab-count.red { background: #fee2e2; color: #dc2626; }
+
+  /* Filter Toolbar */
+  .toolbar {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;
+  }
+  .toolbar input { flex: 1; min-width: 180px; padding: 8px 12px; font-size: 13px; }
+  .toolbar select { padding: 8px 10px; border-radius: 10px; border: 1.5px solid #cbd5e1; font-size: 13px; background: #fff; }
+
+  /* Item Cards */
+  .item-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 1px 4px rgba(15,23,42,0.04);
+  }
+  .item-card.pending { border-left: 4px solid #f59e0b; background: #fffdf5; }
+  .item-card.rejected { border-left: 4px solid #dc2626; opacity: 0.78; }
+  .item-head {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .item-title { font-size: 15px; font-weight: 800; color: var(--navy); }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 800;
+  }
+  .b-pending { background: #fef3c7; color: #b45309; }
+  .b-approved { background: #dcfce7; color: #15803d; }
+  .b-rejected { background: #fee2e2; color: #b91c1c; }
+  .b-floor { background: #e0f2fe; color: #0369a1; }
+  .item-meta { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .item-reason {
+    background: #fef3c7; color: #92400e; padding: 6px 10px; border-radius: 8px;
+    font-size: 12px; font-weight: 700; margin-bottom: 8px;
+  }
+  .item-comment { font-size: 13.5px; color: #1e293b; line-height: 1.55; margin-bottom: 8px; white-space: pre-wrap; }
+  .item-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+  .tag-pill { background: #f1f5f9; color: #334155; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+  .item-photo {
+    max-width: 260px; max-height: 190px; border-radius: 10px; border: 1px solid var(--border);
+    cursor: zoom-in; display: block; margin-bottom: 10px; object-fit: cover;
+  }
+  .item-actions { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid #f1f5f9; }
+
+  .empty {
+    text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px;
+    background: #fff; border-radius: 14px; border: 1px dashed #cbd5e1;
+  }
+  #lightbox {
+    display: none; position: fixed; inset: 0; z-index: 999; background: rgba(15,23,42,0.88);
+    align-items: center; justify-content: center; padding: 16px; cursor: zoom-out;
+  }
+  #lightbox img { max-width: 95vw; max-height: 92vh; border-radius: 10px; }
+  #toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000;
+    background: #0f172a; color: #fff; padding: 10px 18px; border-radius: 999px;
+    font-size: 13px; font-weight: 700; display: none; box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+  }
+</style>
+</head>
+<body>
+
+<div class="login-wrap" id="loginView">
+  <div class="login-card">
+    <h1>🛠️ 臺大廁所地圖管理後台</h1>
+    <p>獨立審核網站，可即時預覽待審照片、一鍵核准或下架評論、管理新增點位與查看網站回饋。</p>
+    <input type="password" id="keyInput" class="input-el" placeholder="請輸入管理密碼" onkeydown="if(event.key==='Enter') doLogin()" />
+    <button class="btn btn-primary" style="width:100%;margin-top:12px;" id="loginBtn" onclick="doLogin()">登入管理後台</button>
+    <div id="loginErr" style="color:#dc2626;font-size:12.5px;margin-top:10px;font-weight:700;"></div>
+    <div style="margin-top:16px;text-align:center;">
+      <a href="https://yangyanglin1115.github.io/ntu-toilet-map/" style="font-size:12.5px;color:#64748b;">← 返回公開地圖網站</a>
+    </div>
+  </div>
+</div>
+
+<div class="app" id="appView">
+  <div class="topbar">
+    <div class="topbar-title">🛠️ 臺大廁所地圖｜管理後台</div>
+    <div class="topbar-actions">
+      <button class="top-link" onclick="loadData()">🔄 重新整理</button>
+      <a class="top-link" href="https://docs.google.com/spreadsheets/d/1a3vuyoxjEAfc6_HLqQGA3_Ezj7qWsBFI3X0VGRgPpPM/edit" target="_blank">📊 Google Sheets</a>
+      <a class="top-link" href="https://yangyanglin1115.github.io/ntu-toilet-map/" target="_blank">🗺️ 公開地圖</a>
+      <button class="top-link" onclick="logout()">🚪 登出</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="warn-banner" id="v4WarnBanner"></div>
+
+    <div class="kpi-grid">
+      <div class="kpi alert"><div class="kpi-label">🔔 待審核項目</div><div class="kpi-val" id="kPending">0</div></div>
+      <div class="kpi good"><div class="kpi-label">✅ 已公開評論</div><div class="kpi-val" id="kApproved">0</div></div>
+      <div class="kpi"><div class="kpi-label">📷 含照片評論</div><div class="kpi-val" id="kPhotos">0</div></div>
+      <div class="kpi"><div class="kpi-label">📍 使用者新增點位</div><div class="kpi-val" id="kPoints">0</div></div>
+      <div class="kpi"><div class="kpi-label">📮 網站回饋</div><div class="kpi-val" id="kFeedback">0</div></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="pending" onclick="switchTab('pending')">🔔 待審核 <span class="tab-count red" id="cPending">0</span></button>
+      <button class="tab-btn" data-tab="reviews" onclick="switchTab('reviews')">💬 全部評論 <span class="tab-count" id="cReviews">0</span></button>
+      <button class="tab-btn" data-tab="points" onclick="switchTab('points')">📍 新增點位 <span class="tab-count" id="cPoints">0</span></button>
+      <button class="tab-btn" data-tab="feedback" onclick="switchTab('feedback')">📮 網站回饋 <span class="tab-count" id="cFeedback">0</span></button>
+    </div>
+
+    <div class="toolbar" id="searchToolbar" style="display:none;">
+      <input type="text" id="qInput" class="input-el" placeholder="搜尋館名、留言內容、投稿者、標籤..." oninput="renderList()" />
+      <select id="statusFilter" onchange="renderList()">
+        <option value="ALL">全部狀態</option>
+        <option value="APPROVED">僅已公開</option>
+        <option value="PENDING">僅待審核</option>
+        <option value="REJECTED">僅已下架</option>
+        <option value="PHOTO">僅含照片</option>
+      </select>
+    </div>
+
+    <div id="listArea"></div>
+  </div>
+</div>
+
+<div id="lightbox" onclick="this.style.display='none'"><img id="lbImg" src="" alt="預覽放大" /></div>
+<div id="toast"></div>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbzmDTzAYkOBV8GkmLGWXlmk2u6OKZgIkBAGSK6j3kyjDbB4Bn7rCAF0JoSTL7nW7oK1Gg/exec";
+const NAME_MAP = {"map_restroom_78_14": "心理系南館", "map_restroom_69_16": "農業陳列館", "map_restroom_57_17": "電資二館", "map_restroom_3_18": "水森館", "map_restroom_4_19": "公衛學院", "map_restroom_5_20": "基礎醫學大樓", "map_restroom_6_21": "動物科學技術學系", "map_restroom_7_22": "男七舍", "map_restroom_8_23": "男五舍", "map_restroom_9_24": "男三舍", "map_restroom_12_27": "綜合體育館", "map_restroom_14_28": "綜合體育館（東側）", "map_restroom_16_30": "綜合體育館", "map_restroom_17_31": "游泳池", "map_restroom_18_32": "體育館", "map_restroom_19_33": "生化所", "map_restroom_20_34": "電機一館", "map_restroom_21_35": "原分所", "map_restroom_22_36": "土木系", "map_restroom_23_37": "思亮館", "map_restroom_24_38": "數學館", "map_restroom_44_39": "新聞研究所", "map_restroom_25_40": "新生教學館", "map_restroom_26_41": "漁業科學館", "map_restroom_27_42": "國家地震中心", "map_restroom_28_43": "永齡生醫工程館", "map_restroom_29_44": "生技館", "map_restroom_30_45": "男八舍", "map_restroom_31_46": "凝態科學研究中心", "map_restroom_32_47": "霖澤館", "map_restroom_33_48": "外語教學暨資源中心", "map_restroom_34_49": "語文大樓", "map_restroom_35_50": "計算機及資訊網路中心", "map_restroom_60_51": "農藝館", "map_restroom_36_52": "社會科學院（東側）", "map_restroom_37_53": "男一舍", "map_restroom_39_55": "社會科學院（辜振甫圖書館）", "map_restroom_40_56": "社會科學院（西側）", "map_restroom_42_58": "國家發展研究所", "map_restroom_45_60": "德田樓", "map_restroom_46_61": "獸醫系三館", "map_restroom_47_62": "農機館", "map_restroom_48_63": "中非大樓", "map_restroom_49_64": "工程科學及海洋學系", "map_restroom_50_65": "環境工程館", "map_restroom_51_66": "推廣教育大樓", "map_restroom_52_67": "推廣教育大樓", "map_restroom_53_68": "第二活動中心／管院二號館（南側）", "map_restroom_54_69": "第二活動中心／管院二號館（北側）", "map_restroom_55_70": "管理學院教研館", "map_restroom_56_71": "雅頌坊", "map_restroom_58_72": "應用力學館", "map_restroom_61_73": "生命科學館", "map_restroom_63_75": "生命科學館", "map_restroom_64_76": "望樂樓", "map_restroom_65_77": "展書樓", "map_restroom_66_78": "地質科學系／地質館", "map_restroom_96_79": "博理館", "map_restroom_67_80": "大氣科學系", "map_restroom_68_81": "地理系館", "map_restroom_70_82": "舊圖書館", "map_restroom_71_83": "舊圖書館", "map_restroom_73_85": "文學院", "map_restroom_75_86": "管理學院一號館", "map_restroom_76_87": "管理學院一號館", "map_restroom_77_88": "浩瀚樓", "map_restroom_79_89": "心理系北館", "map_restroom_80_90": "新生地下汽車停車場", "map_restroom_81_91": "新生地下汽車停車場", "map_restroom_82_92": "新月台-無障礙坡道", "map_restroom_83_93": "博雅教學館", "map_restroom_84_94": "積學館", "map_restroom_85_95": "化學系", "map_restroom_86_96": "萬才館", "map_restroom_87_97": "霖澤館", "map_restroom_88_98": "土木研究大樓", "map_restroom_89_99": "女九舍餐廳", "map_restroom_90_100": "男六舍", "map_restroom_92_101": "飲水樓", "map_restroom_93_102": "數學研究中心", "map_restroom_94_103": "人工氣候室", "map_restroom_95_104": "明達館", "map_restroom_97_105": "綜合體育館（正門左側）", "map_restroom_98_106": "綜合體育館（正門右側）", "map_restroom_99_107": "天文數學館", "map_restroom_100_108": "圖資系", "map_restroom_102_110": "圖書館", "map_restroom_103_111": "圖書館", "map_restroom_104_112": "農業綜合大樓", "map_restroom_105_113": "衛生保健中心", "map_restroom_106_114": "普通教學館", "map_restroom_108_115": "環境研究大樓", "map_restroom_111_118": "應用力學館", "map_restroom_112_119": "思亮館國際會議中心", "map_restroom_113_120": "農化新館", "map_restroom_114_121": "水源校區行政大樓", "map_restroom_115_122": "普通教學館", "map_restroom_117_124": "天文數學館", "map_restroom_118_125": "海洋研究所", "map_restroom_123_128": "凝態科學研究中心", "map_restroom_1_130": "育成中心B棟", "map_restroom_2_131": "卓越研究大樓", "map_restroom_91_132": "動物醫院", "map_restroom_125_135": "全家便利商店", "map_restroom_107_136": "共同教學館", "NTU Gender Equity Committee (2025-03)_1_137": "禮賢樓", "NTU Gender Equity Committee (2025-03)_2_138": "綜合教學館", "NTU Gender Equity Committee (2025-03)_3_139": "次震宇宙館", "NTU Gender Equity Committee (2025-03)_4_140": "鄭江樓北棟", "NTU Gender Equity Committee (2025-03)_5_141": "鄭江樓南棟", "NTU Gender Equity Committee (2025-03)_6_142": "植物培育溫室", "NTU Gender Equity Committee (2025-03)_7_143": "學新館", "NTU Gender Equity Committee (2025-03)_8_144": "立體機車停車場", "NTU Gender Equity Committee (2025-03)_9_145": "宗倬章館", "NTU Gender Equity Committee (2025-03)_10_146": "醫學院基礎醫學大樓", "NTU Gender Equity Committee (2025-03)_11_147": "第一學生活動中心（活大）", "NTU Gender Equity Committee (2025-03)_12_148": "國青大樓", "NTU Gender Equity Committee (2025-03)_13_149": "社會與社工館", "NTU Gender Equity Committee (2025-03)_14_150": "第二學生活動中心（二活）", "NTU Gender Equity Committee (2025-03)_15_151": "學生心理輔導中心", "NTU Gender Equity Committee (2025-03)_16_152": "普通教學館", "NTU Gender Equity Committee (2025-03)_17_153": "校安中心", "NTU Gender Equity Committee (2025-03)_18_154": "工學院綜合大樓", "NTU Gender Equity Committee (2025-03)_19_155": "文學院研究大樓", "NTU Gender Equity Committee (2025-03)_20_156": "總圖書館", "NTU Gender Equity Committee (2025-03)_21_157": "綜合體育館（新體）", "NTU Gender Equity Committee (2025-03)_22_158": "外語教學暨資源中心（外教中心）", "map_nurseryroom_159_159": "哺集乳室-體育館1樓", "bldg_gen_1": "鹿鳴堂（一般廁所）", "bldg_gen_2": "醫學院男二女六舍（一般廁所）", "bldg_gen_6": "樂學館（一般廁所）", "bldg_gen_7": "太子學舍長興舍區（一般廁所）", "bldg_gen_8": "畜產製造學研究室（一般廁所）", "bldg_gen_9": "藏青室（一般廁所）", "bldg_gen_10": "牛棚（一般廁所）", "bldg_gen_12": "臺大醫院東址（一般廁所）", "bldg_gen_13": "行政大樓 (城中校區)（一般廁所）", "bldg_gen_14": "前排教室（一般廁所）", "bldg_gen_15": "漁業生物實驗室（一般廁所）", "bldg_gen_16": "畜牧分場辦公室（一般廁所）", "bldg_gen_17": "燻煙室（一般廁所）", "bldg_gen_18": "後排教室（一般廁所）", "bldg_gen_19": "昆蟲館（一般廁所）", "bldg_gen_20": "人文館（一般廁所）", "bldg_gen_21": "國立臺灣大學工學博物館（一般廁所）", "bldg_gen_22": "太子學舍水源舍區 (A棟)（一般廁所）", "bldg_gen_23": "映新館（一般廁所）", "bldg_gen_24": "澄思樓（一般廁所）", "bldg_gen_25": "溫州街眷舍(臺靜農故居)（一般廁所）", "bldg_gen_26": "造園館（一般廁所）", "bldg_gen_27": "(慶齡)工業研究中心（一般廁所）", "bldg_gen_28": "大一女舍（一般廁所）", "bldg_gen_29": "水工試驗所舊館（一般廁所）", "bldg_gen_30": "第一男研究生宿舍（一般廁所）", "bldg_gen_31": "女二舍（一般廁所）", "bldg_gen_32": "化學工程館（一般廁所）", "bldg_gen_33": "花卉館（一般廁所）", "bldg_gen_34": "農業昆蟲館（一般廁所）", "bldg_gen_36": "聯合教學館（一般廁所）", "bldg_gen_37": "行政大樓 (校總區)（一般廁所）", "bldg_gen_38": "三號館（一般廁所）", "bldg_gen_39": "尊賢館（一般廁所）", "bldg_gen_40": "自動控溫管理室（一般廁所）", "bldg_gen_41": "圓形小劇場（一般廁所）", "bldg_gen_42": "食品研發大樓（一般廁所）", "bldg_gen_43": "園產品加工館（一般廁所）", "bldg_gen_44": "獸醫館（一般廁所）", "bldg_gen_45": "第一女研究生宿舍（一般廁所）", "bldg_gen_46": "森林環境暨資源學系（一般廁所）", "bldg_gen_47": "男四宿舍（一般廁所）", "bldg_gen_48": "女四宿舍（一般廁所）", "bldg_gen_49": "四號館（一般廁所）", "bldg_gen_50": "臺大醫院（一般廁所）", "bldg_gen_51": "經研大樓（一般廁所）", "bldg_gen_52": "漁業陳列館（一般廁所）", "bldg_gen_53": "動物標本館（一般廁所）", "bldg_gen_54": "諮商輔導室及理髮室 (舊址)（一般廁所）", "bldg_gen_55": "社科院學生活動中心 (舊址)（一般廁所）", "bldg_gen_56": "教職員宿舍（一般廁所）", "bldg_gen_57": "植物標本館（一般廁所）", "bldg_gen_59": "護理系館（一般廁所）", "bldg_gen_60": "芳蘭大厝（一般廁所）", "bldg_gen_61": "五號館（一般廁所）", "bldg_gen_62": "農產品展售中心（一般廁所）", "bldg_gen_63": "農化系實驗室（一般廁所）", "bldg_gen_64": "社科院圖書分館（一般廁所）", "bldg_gen_65": "臺大校友會館（一般廁所）", "bldg_gen_66": "法學院機電室（一般廁所）", "bldg_gen_67": "醫學院體育館（一般廁所）", "bldg_gen_68": "藥學系館(六號館)（一般廁所）", "bldg_gen_69": "會議中心暨醫學研究大樓（一般廁所）", "bldg_gen_71": "食品科技館（一般廁所）", "bldg_gen_72": "行政大樓西側平房（一般廁所）", "bldg_gen_73": "多功能生活廳（一般廁所）", "bldg_gen_74": "全球變遷中心（一般廁所）", "bldg_gen_77": "水工試驗大樓（一般廁所）", "bldg_gen_78": "忠興館（一般廁所）", "bldg_gen_79": "農業試驗場辦公室（一般廁所）", "bldg_gen_80": "女八舍（一般廁所）", "bldg_gen_81": "航空測量館（一般廁所）", "bldg_gen_82": "思源樓（一般廁所）", "bldg_gen_83": "園藝教學管理研究室（一般廁所）", "bldg_gen_84": "資訊工程德田館（一般廁所）", "bldg_gen_86": "育成中心A棟（一般廁所）", "bldg_gen_87": "女三舍（一般廁所）", "bldg_gen_88": "女一舍（一般廁所）", "bldg_gen_89": "太子學舍-修齊會館（一般廁所）", "bldg_gen_90": "太子學舍水源舍區 (C棟)（一般廁所）", "bldg_gen_91": "綠房子（一般廁所）", "bldg_gen_92": "舊高等農林學校作業室（磯永吉紀念室）（一般廁所）", "bldg_gen_93": "太子學舍水源舍區 (B棟)（一般廁所）", "bldg_gen_94": "知武館（一般廁所）", "bldg_gen_96": "實驗動物資源中心（一般廁所）", "bldg_gen_97": "醫學人文館（一般廁所）"};
+const PUBLIC_MAP_URL = "https://yangyanglin1115.github.io/ntu-toilet-map/";
+const LS_KEY = "ntu_toilet_admin_key_v1";
+
+let adminKey = localStorage.getItem(LS_KEY) || "";
+let currentTab = "pending";
+let allReviews = [];
+let allPoints = [];
+let isReadOnlyFallback = false;
+
+function escapeHtml(s) {
+  return String(s || "").replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
+}
+
+function formatTime(t) {
+  const s = String(t || "").trim();
+  if (!s) return "";
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  return s;
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.style.display = "block";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.style.display = "none", 2600);
+}
+
+function openLb(src) {
+  document.getElementById("lbImg").src = src;
+  document.getElementById("lightbox").style.display = "flex";
+}
+
+function doLogin() {
+  const val = document.getElementById("keyInput").value.trim();
+  if (!val) { document.getElementById("loginErr").textContent = "請輸入管理密碼"; return; }
+  adminKey = val;
+  document.getElementById("loginBtn").disabled = true;
+  document.getElementById("loginErr").textContent = "驗證中...";
+  loadData(true);
+}
+
+function logout() {
+  localStorage.removeItem(LS_KEY);
+  adminKey = "";
+  document.getElementById("appView").style.display = "none";
+  document.getElementById("loginView").style.display = "flex";
+  document.getElementById("keyInput").value = "";
+  document.getElementById("loginErr").textContent = "";
+}
+
+async function loadData(fromLogin = false) {
+  try {
+    const resp = await fetch(`${API_URL}?action=adminData&key=${encodeURIComponent(adminKey)}&_t=${Date.now()}`);
+    const data = await resp.json();
+    if (!data.ok) {
+      document.getElementById("loginBtn").disabled = false;
+      document.getElementById("loginErr").textContent = data.error || "密碼錯誤或無法驗證";
+      return;
+    }
+    // 判斷是否為 v4（含有 version: "v4"）或尚未升級的 v3 公開格式
+    if (data.version === "v4") {
+      isReadOnlyFallback = false;
+      allReviews = data.reviews || [];
+      allPoints = data.points || [];
+      document.getElementById("v4WarnBanner").style.display = "none";
+    } else {
+      // 尚未把 Apps Script 更新至 v4 時，先降級顯示公開資料並提示更新步驟
+      isReadOnlyFallback = true;
+      allReviews = [];
+      Object.entries(data.reviews || {}).forEach(([fid, arr]) => {
+        arr.forEach((r, idx) => allReviews.push(Object.assign({ row: 0, feature_id: fid, status: "APPROVED", flag_reason: "" }, r)));
+      });
+      allPoints = (data.points || []).map(f => Object.assign({
+        row: 0, status: "APPROVED", flag_reason: "",
+        lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0]
+      }, f.properties));
+      const b = document.getElementById("v4WarnBanner");
+      b.innerHTML = "⚠️ <b>提示：</b>目前雲端 Apps Script 仍為 v3 版本（僅能檢視已公開資料）。請將 <code>google_apps_script_backend.js (v4)</code> 貼上 Apps Script 並發佈新版本，即可啟用「預覽待審照片＋一鍵核准／下架／刪除」完整後台功能！";
+      b.style.display = "block";
+    }
+
+    localStorage.setItem(LS_KEY, adminKey);
+    document.getElementById("loginView").style.display = "none";
+    document.getElementById("appView").style.display = "block";
+    document.getElementById("loginBtn").disabled = false;
+    updateKPIs();
+    renderList();
+    if (!fromLogin) showToast("已更新最新雲端資料");
+  } catch (err) {
+    document.getElementById("loginBtn").disabled = false;
+    document.getElementById("loginErr").textContent = "連線雲端失敗，請稍後再試";
+    showToast("讀取資料失敗");
+  }
+}
+
+function updateKPIs() {
+  const normalRevs = allReviews.filter(r => r.feature_id !== "__SITE_FEEDBACK__");
+  const feedbacks  = allReviews.filter(r => r.feature_id === "__SITE_FEEDBACK__");
+  const pendingRevs = normalRevs.filter(r => r.status === "PENDING");
+  const pendingPts  = allPoints.filter(p => p.status === "PENDING");
+  const pendingTotal = pendingRevs.length + pendingPts.length;
+
+  document.getElementById("kPending").textContent = pendingTotal;
+  document.getElementById("kApproved").textContent = normalRevs.filter(r => r.status === "APPROVED").length;
+  document.getElementById("kPhotos").textContent = normalRevs.filter(r => r.photo_url).length;
+  document.getElementById("kPoints").textContent = allPoints.length;
+  document.getElementById("kFeedback").textContent = feedbacks.length;
+
+  document.getElementById("cPending").textContent = pendingTotal;
+  document.getElementById("cReviews").textContent = normalRevs.length;
+  document.getElementById("cPoints").textContent = allPoints.length;
+  document.getElementById("cFeedback").textContent = feedbacks.length;
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  document.getElementById("searchToolbar").style.display = (tab === "reviews") ? "flex" : "none";
+  renderList();
+}
+
+async function moderateRow(sheet, row, decision) {
+  if (isReadOnlyFallback) { showToast("請先將 Apps Script 升級至 v4"); return; }
+  if (decision === "DELETE" && !confirm("確定要永久刪除這筆資料（含雲端照片）嗎？此動作無法復原。")) return;
+  showToast("正在更新雲端狀態...");
+  try {
+    const url = `${API_URL}?action=adminModerate&key=${encodeURIComponent(adminKey)}&sheet=${encodeURIComponent(sheet)}&row=${row}&decision=${decision}&_t=${Date.now()}`;
+    const resp = await fetch(url);
+    const res = await resp.json();
+    if (!res.ok) { showToast("操作失敗：" + (res.error || "未知錯誤")); return; }
+    showToast(decision === "APPROVED" ? "✅ 已核准公開！" : (decision === "REJECTED" ? "❌ 已下架隱藏" : "🗑️ 已永久刪除"));
+    loadData(true);
+  } catch (e) {
+    showToast("連線錯誤，請重試");
+  }
+}
+
+function statusBadge(st) {
+  if (st === "PENDING") return '<span class="badge b-pending">待審核</span>';
+  if (st === "REJECTED") return '<span class="badge b-rejected">已下架</span>';
+  return '<span class="badge b-approved">已公開</span>';
+}
+
+function renderReviewCard(r) {
+  const placeName = r.feature_id === "__SITE_FEEDBACK__" ? "📮 網站意見回饋" : (NAME_MAP[r.feature_id] || r.feature_id);
+  const avg = (((+r.clean) + (+r.vent) + (+r.equip)) / 3).toFixed(1);
+  const cardCls = r.status === "PENDING" ? "pending" : (r.status === "REJECTED" ? "rejected" : "");
+  const actionsHtml = !isReadOnlyFallback && r.row ? `
+    <div class="item-actions">
+      ${r.status !== "APPROVED" ? `<button class="btn btn-primary btn-sm" onclick="moderateRow('Reviews', ${r.row}, 'APPROVED')">✅ 核准公開</button>` : ""}
+      ${r.status !== "REJECTED" ? `<button class="btn btn-outline btn-sm" onclick="moderateRow('Reviews', ${r.row}, 'REJECTED')">🚫 下架隱藏</button>` : ""}
+      <button class="btn btn-danger btn-sm" onclick="moderateRow('Reviews', ${r.row}, 'DELETE')">🗑️ 永久刪除</button>
+    </div>` : "";
+  return `
+    <div class="item-card ${cardCls}">
+      <div class="item-head">
+        <div>
+          <div class="item-title">${escapeHtml(placeName)}</div>
+          <div class="item-meta">
+            投稿者：<b>${escapeHtml(r.author)}</b>
+            ${r.feature_id !== "__SITE_FEEDBACK__" ? `｜★ ${avg}（整潔${r.clean} / 通風${r.vent} / 設備${r.equip}）` : ""}
+            ｜${escapeHtml(formatTime(r.time))}
+          </div>
+        </div>
+        <div style="display:flex;gap:5px;align-items:center;">
+          <span class="badge b-floor">${escapeHtml(r.floor)}</span>
+          ${statusBadge(r.status)}
+        </div>
+      </div>
+      ${r.flag_reason ? `<div class="item-reason">⚠️ 攔截原因：${escapeHtml(r.flag_reason)}</div>` : ""}
+      <div class="item-comment">${escapeHtml(r.comment || "（無文字留言）")}</div>
+      ${(r.tags && r.tags.length) ? `<div class="item-tags">${r.tags.map(t => `<span class="tag-pill">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
+      ${r.photo_url ? `<img class="item-photo" src="${escapeHtml(r.photo_url)}" onclick="openLb(this.src)" alt="投稿照片" />` : ""}
+      ${actionsHtml}
+    </div>
+  `;
+}
+
+function renderPointCard(p) {
+  const cardCls = p.status === "PENDING" ? "pending" : (p.status === "REJECTED" ? "rejected" : "");
+  const actionsHtml = !isReadOnlyFallback && p.row ? `
+    <div class="item-actions">
+      ${p.status !== "APPROVED" ? `<button class="btn btn-primary btn-sm" onclick="moderateRow('NewPoints', ${p.row}, 'APPROVED')">✅ 核准上線</button>` : ""}
+      ${p.status !== "REJECTED" ? `<button class="btn btn-outline btn-sm" onclick="moderateRow('NewPoints', ${p.row}, 'REJECTED')">🚫 下架隱藏</button>` : ""}
+      <button class="btn btn-danger btn-sm" onclick="moderateRow('NewPoints', ${p.row}, 'DELETE')">🗑️ 永久刪除</button>
+      <a class="btn btn-ghost btn-sm" href="${PUBLIC_MAP_URL}?id=${encodeURIComponent(p.feature_id)}" target="_blank">🗺️ 地圖檢視</a>
+    </div>` : "";
+  return `
+    <div class="item-card ${cardCls}">
+      <div class="item-head">
+        <div>
+          <div class="item-title">📍 ${escapeHtml(p.name || p.feature_id)}</div>
+          <div class="item-meta">分類：${escapeHtml(p.category)}｜樓層：${escapeHtml(p.floor)}｜24H：${escapeHtml(p.is_24h)}｜WGS84: ${Number(p.lat).toFixed(5)}, ${Number(p.lon).toFixed(5)}｜${escapeHtml(formatTime(p.time))}</div>
+        </div>
+        ${statusBadge(p.status)}
+      </div>
+      ${p.flag_reason ? `<div class="item-reason">⚠️ 攔截原因：${escapeHtml(p.flag_reason)}</div>` : ""}
+      <div class="item-comment">${escapeHtml(p.description || "（無補充說明）")}</div>
+      ${p.photo_url ? `<img class="item-photo" src="${escapeHtml(p.photo_url)}" onclick="openLb(this.src)" alt="點位照片" />` : ""}
+      ${actionsHtml}
+    </div>
+  `;
+}
+
+function renderList() {
+  const area = document.getElementById("listArea");
+  const normalRevs = allReviews.filter(r => r.feature_id !== "__SITE_FEEDBACK__").slice().reverse();
+  const feedbacks  = allReviews.filter(r => r.feature_id === "__SITE_FEEDBACK__").slice().reverse();
+  const pts        = allPoints.slice().reverse();
+
+  if (currentTab === "pending") {
+    const pRevs = normalRevs.filter(r => r.status === "PENDING");
+    const pPts  = pts.filter(p => p.status === "PENDING");
+    if (!pRevs.length && !pPts.length) {
+      area.innerHTML = '<div class="empty">🎉 太棒了！目前沒有任何待審核的照片或異常投稿。</div>';
+      return;
+    }
+    area.innerHTML = pPts.map(renderPointCard).join("") + pRevs.map(renderReviewCard).join("");
+    return;
+  }
+
+  if (currentTab === "reviews") {
+    const q = (document.getElementById("qInput").value || "").trim().toLowerCase();
+    const sf = document.getElementById("statusFilter").value;
+    const filtered = normalRevs.filter(r => {
+      if (sf === "PHOTO" && !r.photo_url) return false;
+      else if (sf !== "ALL" && sf !== "PHOTO" && r.status !== sf) return false;
+      if (q) {
+        const hay = `${NAME_MAP[r.feature_id] || ""} ${r.feature_id} ${r.author} ${r.comment} ${(r.tags||[]).join(" ")}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+    area.innerHTML = filtered.length ? filtered.map(renderReviewCard).join("") : '<div class="empty">找不到符合條件的評論。</div>';
+    return;
+  }
+
+  if (currentTab === "points") {
+    area.innerHTML = pts.length ? pts.map(renderPointCard).join("") : '<div class="empty">目前尚無使用者新增的廁所點位。</div>';
+    return;
+  }
+
+  if (currentTab === "feedback") {
+    area.innerHTML = feedbacks.length ? feedbacks.map(renderReviewCard).join("") : '<div class="empty">目前尚無網站回饋訊息。</div>';
+  }
+}
+
+if (adminKey) {
+  document.getElementById("keyInput").value = adminKey;
+  loadData(true);
+}
+</script>
+</body>
+</html>
