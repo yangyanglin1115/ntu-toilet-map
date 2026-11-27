@@ -614,7 +614,7 @@ const ALL_BLDG_LABELS = [{"name":"鹿鳴堂","lat":25.01511,"lon":121.5376},{"na
 const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbzmDTzAYkOBV8GkmLGWXlmk2u6OKZgIkBAGSK6j3kyjDbB4Bn7rCAF0JoSTL7nW7oK1Gg/exec";
 
 const QUICK_TAGS = [
-  "有免治馬桶", "有消毒/坐墊紙", "有衛生棉", "有衛生紙", "衛生紙沒了",
+  "有免治馬桶", "有消毒/坐墊紙", "有衛生棉", "有烘手機", "有衛生紙", "衛生紙沒了",
   "有掛鉤/置物架", "有洗手乳", "安靜乾淨", "空間寬敞", "潮濕/異味", "下課易排隊", "需門禁卡"
 ];
 
@@ -1091,8 +1091,9 @@ function openPointSheet(fid, startInRateMode = false, floorFilter = "all") {
            ? `<div class="review-photo-frame"><img class="review-photo" src="${escapeHtml(r.photo_url)}" alt="評論照片" onclick="openLightbox('${escapeHtml(r.photo_url)}', '${escapeHtml(rPhotoCredit)}')" /><span class="photo-credit">來源：${escapeHtml(rPhotoCredit)}</span></div>`
            : "";
          const fGrp = getFloorGroup(r.floor);
-         const floorBadge = fGrp
-           ? `<span class="floor-pill ${fGrp==='一樓'?'floor-1f':'floor-other'}" title="原始填寫：${escapeHtml(r.floor)}">${fGrp}</span>`
+         const floorText = (r.floor && r.floor !== "不確定") ? r.floor : fGrp;
+         const floorBadge = floorText
+           ? `<span class="floor-pill ${fGrp==='一樓'?'floor-1f':'floor-other'}">${escapeHtml(floorText)}</span>`
            : "";
          return `
          <div class="review-item">
@@ -1126,7 +1127,7 @@ function openPointSheet(fid, startInRateMode = false, floorFilter = "all") {
     </div>
 
     <div class="rate-box" id="rateFormBox" style="display:${startInRateMode ? 'block' : 'none'};">
-      <span class="field-label">1. 你使用的是哪一樓？（前台會簡化顯示為「一樓」或「一樓以外」）</span>
+      <span class="field-label">1. 你使用的是哪一樓？</span>
       <select id="inFloor" class="input-el" style="margin-bottom:8px;">
         <option value="1F" selected>1F（一樓）</option>
         <option value="B1">B1（地下一樓）</option>
