@@ -1502,7 +1502,7 @@ function updateUserLocationOnMap(lat, lon, accuracy, flyToUser = false) {
   const inBounds = isWithinMapBounds(lat, lon);
   if (!inBounds) {
     if (flyToUser) {
-      showToast("你目前位置超出臺大校區地圖範圍，已維持顯示校總區地圖");
+      showToast("你目前位置超出地圖範圍");
     }
     return false;
   }
@@ -1534,7 +1534,7 @@ function toggleGpsTracking() {
     // Already tracking: re-center on user if within campus bounds
     if (lastUserPos) {
       if (!isWithinMapBounds(lastUserPos.lat, lastUserPos.lon)) {
-        showToast("你目前位置超出臺大校區地圖範圍，已維持顯示校總區地圖");
+        showToast("你目前位置超出地圖範圍");
         return;
       }
       map.flyTo([lastUserPos.lat, lastUserPos.lon], 17);
@@ -1569,7 +1569,7 @@ function toggleGpsTracking() {
 function markMyGps() {
   if (lastUserPos) {
     if (!isWithinMapBounds(lastUserPos.lat, lastUserPos.lon)) {
-      showToast("你目前位置超出臺大校區地圖範圍，請改點地圖或「畫面中心」標記");
+      showToast("你目前位置超出地圖範圍，請改點地圖或「畫面中心」標記");
       return;
     }
     openAddPointSheet(lastUserPos.lat, lastUserPos.lon);
@@ -1581,7 +1581,7 @@ function markMyGps() {
     (pos) => {
       const ok = updateUserLocationOnMap(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true);
       if (!ok) {
-        showToast("你目前位置超出臺大校區地圖範圍，請改點地圖或「畫面中心」標記");
+        showToast("你目前位置超出地圖範圍，請改點地圖或「畫面中心」標記");
         return;
       }
       openAddPointSheet(pos.coords.latitude, pos.coords.longitude);
@@ -1618,7 +1618,7 @@ function renderNearbyList(uLat, uLon) {
   }).join("");
 
   const outBanner = !inBounds
-    ? `<div style="background:#fef3c7;border:1px solid #fcd34d;color:#92400e;border-radius:10px;padding:8px 10px;font-size:12px;margin-bottom:10px;line-height:1.45;">⚠️ 你目前位置超出臺大校區地圖範圍，以下僅依直線距離列出最近的 5 間校內廁所。</div>`
+    ? `<div style="background:#fef3c7;border:1px solid #fcd34d;color:#92400e;border-radius:10px;padding:8px 10px;font-size:12px;margin-bottom:10px;line-height:1.45;">⚠️ 你目前位置超出地圖範圍，以下僅依直線距離列出最近的 5 間校內廁所。</div>`
     : `<div style="font-size:12.5px;color:#475569;margin-bottom:10px;">點選任一間即可導航或評分：</div>`;
 
   openSheet("離你最近的 5 間廁所", outBanner + listHtml);
@@ -1629,7 +1629,7 @@ function openNearbySheet() {
     if (isWithinMapBounds(lastUserPos.lat, lastUserPos.lon)) {
       map.flyTo([lastUserPos.lat, lastUserPos.lon], 17);
     } else {
-      showToast("你目前位置超出臺大校區地圖範圍，已維持顯示校總區地圖");
+      showToast("你目前位置超出地圖範圍");
     }
     renderNearbyList(lastUserPos.lat, lastUserPos.lon);
     return;
