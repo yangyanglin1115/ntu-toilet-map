@@ -787,8 +787,7 @@ async function pushToCloud(payload) {
   } catch (e) {}
 }
 
-// Map Setup (Canvas Renderer + Smooth Tile Buffering for 60fps mobile zoom)
-const sharedCanvas = L.canvas({ padding: 0.5 });
+// Map Setup (Dedicated Panes + Canvas Renderers so toilets ALWAYS stay above buildings & labels)
 const isTouchDevice = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
 const map = L.map("map", {
   zoomControl: false,
@@ -802,6 +801,20 @@ const map = L.map("map", {
   tapTolerance: 15
 }).setView([25.0174, 121.5396], 16);
 L.control.zoom({ position: "bottomright" }).addTo(map);
+
+// 明確固定圖層 Z-Index 順序：底圖(200) < 建物輪廓(360) < 建物與道路文字(420) < 廁所點位(480) < GPS定位(600)
+map.createPane("buildingsPane");
+map.getPane("buildingsPane").style.zIndex = 360;
+
+map.createPane("labelsPane");
+map.getPane("labelsPane").style.zIndex = 420;
+map.getPane("labelsPane").style.pointerEvents = "none";
+
+map.createPane("toiletsPane");
+map.getPane("toiletsPane").style.zIndex = 480;
+
+const buildingsCanvas = L.canvas({ padding: 0.5, pane: "buildingsPane" });
+const toiletsCanvas = L.canvas({ padding: 0.5, pane: "toiletsPane" });
 
 const tileOpts = { updateWhenZooming: false, updateWhenIdle: true, keepBuffer: 4 };
 // 預設底圖：內政部國土測繪中心 臺灣通用電子地圖（彩色 EMAP）
@@ -863,6 +876,7 @@ const detailLabelsLayer = L.layerGroup();
 NTU_LANDMARKS.forEach(lm => {
   const cls = lm.type === "road" ? "ntu-road-label" : "ntu-label";
   L.marker([lm.lat, lm.lon], {
+    pane: "labelsPane",
     interactive: false,
     icon: L.divIcon({ className: "", html: `<div class="${cls}">${lm.name}</div>`, iconSize: [0, 0] })
   }).addTo(landmarkLabelsLayer);
@@ -891,6 +905,7 @@ function renderDetailBuildingLabels() {
     if (overlaps) return;
     placed.push(pt);
     L.marker([b.lat, b.lon], {
+      pane: "labelsPane",
       interactive: false,
       icon: L.divIcon({ className: "", html: `<div class="ntu-sub-label">${escapeHtml(b.name)}</div>`, iconSize: [0, 0] })
     }).addTo(detailLabelsLayer);
@@ -899,7 +914,8 @@ function renderDetailBuildingLabels() {
 
 let bldgUserEnabled = true;
 const buildingsLayer = L.geoJSON(BUILDINGS_DATA, {
-  renderer: sharedCanvas,
+  pane: "buildingsPane",
+  renderer: buildingsCanvas,
   interactive: !isTouchDevice,
   style: { fillColor: "#dce6f2", fillOpacity: 0.62, color: "#64748b", weight: 1.0 },
   onEachFeature: (feat, layer) => {
@@ -968,7 +984,8 @@ function renderPoints() {
     const meta = CATEGORY_META[p.category] || { color: "#475569", radius: 7 };
 
     const marker = L.circleMarker([lat, lon], {
-      renderer: sharedCanvas,
+      pane: "toiletsPane",
+      renderer: toiletsCanvas,
       interactive: !isTouchDevice,
       radius: st.count > 0 ? meta.radius + 1.0 : meta.radius,
       fillColor: meta.color,
