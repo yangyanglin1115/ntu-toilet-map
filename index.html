@@ -1261,8 +1261,9 @@ function openBuildingSheet(bldgFeat) {
 let activeIndoorKey = null;
 let activeIndoorFloor = null;
 let activeIndoorLayer = null;
+let indoorDismissedKey = null;
 
-function activateIndoorOverlay(bldgKey, floorName, skipFly = false) {
+function activateIndoorOverlay(bldgKey, floorName, skipFly = false, silent = false) {
   const entry = FLOORPLANS_DATA[bldgKey];
   if (!entry) return;
   const ovFloors = (entry.floors || []).filter(fl => fl.overlay && fl.bounds);
@@ -1275,6 +1276,7 @@ function activateIndoorOverlay(bldgKey, floorName, skipFly = false) {
   }
   activeIndoorKey = bldgKey;
   activeIndoorFloor = targetFl.floor;
+  indoorDismissedKey = null;
 
   activeIndoorLayer = L.imageOverlay(targetFl.overlay, targetFl.bounds, {
     pane: "indoorPane",
@@ -1287,10 +1289,11 @@ function activateIndoorOverlay(bldgKey, floorName, skipFly = false) {
     map.setView(entry.center, z < 18 ? 18 : z, { animate: true });
   }
   renderIndoorBar();
-  showToast(`已套疊 ${bldgKey} ${targetFl.floor} 平面圖（可於右側切換樓層）`);
+  if (!silent) showToast(`已套疊 ${bldgKey} ${targetFl.floor} 平面圖（可於右側切換樓層）`);
 }
 
-function closeIndoorOverlay(silent = false) {
+function closeIndoorOverlay(silent = false, manual = false) {
+  if (manual && activeIndoorKey) indoorDismissedKey = activeIndoorKey;
   if (activeIndoorLayer) {
     map.removeLayer(activeIndoorLayer);
     activeIndoorLayer = null;
@@ -1313,13 +1316,13 @@ function renderIndoorBar() {
         <button class="indoor-fl-btn ${fl.floor === activeIndoorFloor ? "active" : ""}" onclick="activateIndoorOverlay('${escapeHtml(activeIndoorKey)}','${escapeHtml(fl.floor)}',true)">${escapeHtml(fl.floor)}</button>
       `).join("")}
       <button class="indoor-act-btn" title="放大看完整圖例" onclick="openFloorPlanModal('${escapeHtml(activeIndoorKey)}','${escapeHtml(activeIndoorKey)}')">🔍</button>
-      <button class="indoor-act-btn close" title="關閉室內圖" onclick="closeIndoorOverlay()">✕</button>
+      <button class="indoor-act-btn close" title="關閉室內圖" onclick="closeIndoorOverlay(false,true)">✕</button>
     `;
     bar.classList.add("show");
     return;
   }
 
-  // 未開啟套疊時：若使用者手動放大到 zoom >= 18 且畫面中心位於支援室內圖的館舍內，顯示一鍵浮動提示鈕
+  // 若使用者剛剛手動關閉過，但在 zoom >= 18 仍在該館範圍內，提供一鍵重開鈕
   const z = map.getZoom();
   if (z >= 18) {
     const c = map.getCenter();
@@ -1330,7 +1333,7 @@ function renderIndoorBar() {
     });
     if (nearKey) {
       const defFl = FLOORPLANS_DATA[nearKey].default_floor || "1F";
-      bar.innerHTML = `<button class="indoor-hint-pill" onclick="activateIndoorOverlay('${escapeHtml(nearKey)}','${escapeHtml(defFl)}',true)">🗺️ 套疊${escapeHtml(nearKey)}平面圖</button>`;
+      bar.innerHTML = `<button class="indoor-hint-pill" onclick="activateIndoorOverlay('${escapeHtml(nearKey)}','${escapeHtml(defFl)}',true)">🗺️ 重新套疊${escapeHtml(nearKey)}平面圖</button>`;
       bar.classList.add("show");
       return;
     }
@@ -1340,9 +1343,27 @@ function renderIndoorBar() {
 }
 
 function syncIndoorOverlayOnMove() {
-  if (activeIndoorKey && map.getZoom() < 16) {
-    closeIndoorOverlay(true);
-    return;
+  const z = map.getZoom();
+  if (z < 17) {
+    indoorDismissedKey = null;
+    if (activeIndoorKey && z < 16) {
+      closeIndoorOverlay(true, false);
+      return;
+    }
+  }
+  // 放大到 zoom >= 18 且畫面中心位於支援室內圖的館舍（如總圖）時，自動套疊 1F 平面圖並顯示右側樓層條
+  if (z >= 18 && !activeIndoorKey) {
+    const c = map.getCenter();
+    const nearKey = Object.keys(FLOORPLANS_DATA).find(k => {
+      const entry = FLOORPLANS_DATA[k];
+      if (!entry.center || !(entry.floors || []).some(fl => fl.overlay && fl.bounds)) return false;
+      return haversineMeters(c.lat, c.lng, entry.center[0], entry.center[1]) <= 95;
+    });
+    if (nearKey && nearKey !== indoorDismissedKey) {
+      const defFl = FLOORPLANS_DATA[nearKey].default_floor || "1F";
+      activateIndoorOverlay(nearKey, defFl, true, true);
+      return;
+    }
   }
   renderIndoorBar();
 }
