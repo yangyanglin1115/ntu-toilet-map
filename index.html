@@ -607,7 +607,7 @@
           </svg>
         </div>
         <div>
-          <div class="guide-step-title">2. 10 秒快評與拍照分享</div>
+          <div class="guide-step-title">2. 評分與拍照分享</div>
           <div class="guide-step-desc">點「我要評分」選樓層、星星與快速標籤即可送出，也歡迎用手機拍實景照（勿拍到他人）。</div>
         </div>
       </div>
@@ -1159,7 +1159,8 @@ function openPointSheet(fid, startInRateMode = false, floorFilter = "all") {
     ? `<div style="margin-top:12px;"><div style="font-size:12.5px;font-weight:800;color:#475569;margin-bottom:4px;">師生評論（${allReviews.length}）</div>
        ${floorTabsHtml}
        ${reviews.length === 0 ? '<div style="font-size:12px;color:#64748b;padding:8px 0;">此樓層分類尚無評論。</div>' : reviews.slice().reverse().map(r => {
-         const rPhotoCredit = r.photo_source || r.author || "網友提供";
+         const dispAuthor = (!r.author || r.author === "匿名臺大人") ? "匿名台大人" : r.author;
+         const rPhotoCredit = dispAuthor;
          const rPhotoHtml = r.photo_url
            ? `<div class="review-photo-frame"><img class="review-photo" src="${escapeHtml(r.photo_url)}" alt="評論照片" onclick="openLightbox('${escapeHtml(r.photo_url)}', '${escapeHtml(rPhotoCredit)}')" /><span class="photo-credit">來源：${escapeHtml(rPhotoCredit)}</span></div>`
            : "";
@@ -1168,9 +1169,13 @@ function openPointSheet(fid, startInRateMode = false, floorFilter = "all") {
          const floorBadge = floorText
            ? `<span class="floor-pill ${fGrp==='一樓'?'floor-1f':'floor-other'}">${escapeHtml(floorText)}</span>`
            : "";
+         const subDetail = (+r.clean !== +r.vent || +r.vent !== +r.equip)
+           ? `<div style="font-size:11px;color:#64748b;margin-bottom:3px;">整潔 ${r.clean}★ · 通風 ${r.vent}★ · 設備 ${r.equip}★</div>`
+           : "";
          return `
          <div class="review-item">
-           <div class="review-head"><div><strong>${escapeHtml(r.author || "匿名臺大人")}</strong>${floorBadge}</div><span>★ ${(((+r.clean)+(+r.vent)+(+r.equip))/3).toFixed(1)}｜${escapeHtml(formatReviewTime(r.time))}</span></div>
+           <div class="review-head"><div><strong>${escapeHtml(dispAuthor)}</strong>${floorBadge}</div><span>★ ${(((+r.clean)+(+r.vent)+(+r.equip))/3).toFixed(1)}｜${escapeHtml(formatReviewTime(r.time))}</span></div>
+           ${subDetail}
            <div class="review-body">${escapeHtml(r.comment)}</div>
            ${rPhotoHtml}
          </div>`;
@@ -1206,7 +1211,7 @@ function openPointSheet(fid, startInRateMode = false, floorFilter = "all") {
     </div>
 
     <div class="cta-row">
-      <button class="btn-big btn-rate" onclick="toggleRateForm()">★ 我要評分／回報標籤（10秒）</button>
+      <button class="btn-big btn-rate" onclick="toggleRateForm()">★ 我要評分／回報標籤</button>
       <a class="btn-nav" target="_blank" href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}">導航</a>
     </div>
 
@@ -1224,7 +1229,7 @@ function openPointSheet(fid, startInRateMode = false, floorFilter = "all") {
         <option value="不確定">不確定</option>
       </select>
 
-      <span class="field-label">2. 整體滿意度（點擊星星）</span>
+      <span class="field-label">2. 整體滿意度（點擊星星，也會自動帶入下方分項）</span>
       <div class="star-picker" id="starPicker" data-val="4">
         <button type="button" class="star-btn lit" onclick="setStars(1)">★</button>
         <button type="button" class="star-btn lit" onclick="setStars(2)">★</button>
@@ -1233,23 +1238,21 @@ function openPointSheet(fid, startInRateMode = false, floorFilter = "all") {
         <button type="button" class="star-btn" onclick="setStars(5)">★</button>
       </div>
 
-      <span class="field-label">2. 快速標籤（點選即可，不打字也能送出）</span>
+      <span class="field-label" style="margin-top:6px;">分項評分（可依實際體驗各別微調）</span>
+      <div class="sub-score-grid" style="margin-bottom:10px;">
+        <div><label class="field-label">整潔</label><select id="inClean" class="input-el" style="padding:6px;" onchange="syncStarsFromSub()"><option value="5">5★ 很乾淨</option><option value="4" selected>4★ 乾淨</option><option value="3">3★ 普通</option><option value="2">2★ 偏髒</option><option value="1">1★ 很髒</option></select></div>
+        <div><label class="field-label">通風</label><select id="inVent" class="input-el" style="padding:6px;" onchange="syncStarsFromSub()"><option value="5">5★ 無異味</option><option value="4" selected>4★ 良好</option><option value="3">3★ 普通</option><option value="2">2★ 悶／有味</option><option value="1">1★ 異味重</option></select></div>
+        <div><label class="field-label">設備</label><select id="inEquip" class="input-el" style="padding:6px;" onchange="syncStarsFromSub()"><option value="5">5★ 齊全新穎</option><option value="4" selected>4★ 良好</option><option value="3">3★ 普通</option><option value="2">2★ 老舊</option><option value="1">1★ 損壞缺件</option></select></div>
+      </div>
+
+      <span class="field-label">3. 快速標籤（點選即可，不打字也能送出）</span>
       <div class="tag-grid" id="tagGrid">${tagOptsHtml}</div>
       <div style="display:flex;gap:6px;margin:-4px 0 10px 0;">
-        <input type="text" id="inCustomTag" class="input-el" style="padding:7px 10px;font-size:12.5px;" maxlength="10" placeholder="自訂標籤（如：有烘手機、有大鏡子，限10字）" onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomTag();}" />
+        <input type="text" id="inCustomTag" class="input-el" style="padding:7px 10px;font-size:12.5px;" maxlength="10" placeholder="自訂標籤（如：有大鏡子、冷氣涼，限10字）" onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomTag();}" />
         <button type="button" class="btn-sub" style="white-space:nowrap;padding:7px 11px;" onclick="addCustomTag()">＋加入</button>
       </div>
 
-      <details style="margin-bottom:8px;">
-        <summary style="font-size:12px;color:#475569;cursor:pointer;font-weight:700;">展開細項評分（整潔／通風／設備，選填）</summary>
-        <div class="sub-score-grid">
-          <div><label class="field-label">整潔</label><select id="inClean" class="input-el" style="padding:6px;"><option value="5">5★</option><option value="4" selected>4★</option><option value="3">3★</option><option value="2">2★</option><option value="1">1★</option></select></div>
-          <div><label class="field-label">通風</label><select id="inVent" class="input-el" style="padding:6px;"><option value="5">5★</option><option value="4" selected>4★</option><option value="3">3★</option><option value="2">2★</option><option value="1">1★</option></select></div>
-          <div><label class="field-label">設備</label><select id="inEquip" class="input-el" style="padding:6px;"><option value="5">5★</option><option value="4" selected>4★</option><option value="3">3★</option><option value="2">2★</option><option value="1">1★</option></select></div>
-        </div>
-      </details>
-
-      <span class="field-label">3. 上傳實景照片（選填，支援手機直接拍照／相簿）</span>
+      <span class="field-label">4. 上傳實景照片（選填，支援手機直接拍照／相簿）</span>
       <label class="upload-btn">
         <input type="file" id="inPhotoFile" accept="image/*" style="display:none;" onchange="handlePhotoPick(this, 'rev')" />
         拍照或從相簿選擇照片
@@ -1259,13 +1262,12 @@ function openPointSheet(fid, startInRateMode = false, floorFilter = "all") {
         <img id="revPhotoPreviewImg" src="" alt="上傳預覽" />
         <button type="button" class="upload-remove-btn" onclick="clearPickedPhoto('rev')">×</button>
       </div>
-      <input type="text" id="inPhotoSource" class="input-el" style="margin-top:6px;" placeholder="照片來源標註（選填，預設為你的暱稱或「臺大師生實拍」）" />
 
-      <span class="field-label">4. 歡迎分享你的想法（選填）</span>
+      <span class="field-label">5. 歡迎分享你的想法（選填）</span>
       <textarea id="inComment" class="input-el" rows="2" placeholder="例如：3樓最安靜、衛生紙剛補滿、有免治馬桶..."></textarea>
 
-      <span class="field-label">系級／暱稱（選填）</span>
-      <input type="text" id="inAuthor" class="input-el" placeholder="匿名臺大人（例：地理系 B12）" />
+      <span class="field-label">系級／暱稱（選填，未填寫則顯示「匿名台大人」）</span>
+      <input type="text" id="inAuthor" class="input-el" placeholder="匿名台大人（例：地理系 B12）" />
 
       <button class="btn-big btn-rate" id="submitRevBtn" style="margin-top:10px;" onclick="submitReview('${fid}')">送出評分</button>
     </div>
@@ -1322,6 +1324,19 @@ function setStars(val) {
   document.getElementById("inEquip").value = val;
 }
 
+function syncStarsFromSub() {
+  const c = Number(document.getElementById("inClean")?.value || 4);
+  const v = Number(document.getElementById("inVent")?.value || 4);
+  const e = Number(document.getElementById("inEquip")?.value || 4);
+  const avg = Math.round((c + v + e) / 3);
+  const picker = document.getElementById("starPicker");
+  if (!picker) return;
+  picker.dataset.val = avg;
+  Array.from(picker.children).forEach((btn, idx) => {
+    btn.classList.toggle("lit", idx < avg);
+  });
+}
+
 // Client-side Photo Compression (max 900px JPEG ~70-110KB so mobile uploads are fast & free)
 let pickedPhotos = { rev: "", newpt: "" };
 
@@ -1370,9 +1385,9 @@ function submitReview(fid) {
   const vent  = Number(document.getElementById("inVent").value);
   const equip = Number(document.getElementById("inEquip").value);
   const comment = document.getElementById("inComment").value.trim();
-  const author = document.getElementById("inAuthor").value.trim() || "匿名臺大人";
+  const author = document.getElementById("inAuthor").value.trim() || "匿名台大人";
   const photo_data = pickedPhotos.rev || "";
-  const photo_source = (document.getElementById("inPhotoSource")?.value || "").trim() || (author !== "匿名臺大人" ? `${author} 實拍` : "臺大師生實拍");
+  const photo_source = photo_data ? author : "";
   const tags = Array.from(document.querySelectorAll("#tagGrid .tag-opt.selected")).map(el => el.dataset.tag);
 
   const now = new Date();
@@ -1524,7 +1539,7 @@ function renderNearbyList(uLat, uLon) {
     `;
   }).join("");
 
-  openSheet("離你最近的 5 間廁所", `<div style="font-size:12.5px;color:#475569;margin-bottom:10px;">點選任一間即可導航或 10 秒快評：</div>` + listHtml);
+  openSheet("離你最近的 5 間廁所", `<div style="font-size:12.5px;color:#475569;margin-bottom:10px;">點選任一間即可導航或評分：</div>` + listHtml);
 }
 
 function openNearbySheet() {
@@ -1597,7 +1612,7 @@ function openAddPointSheet(lat, lon) {
       <button type="button" class="upload-remove-btn" onclick="clearPickedPhoto('newpt')">×</button>
     </div>
     <label class="field-label">你的系級／暱稱（選填）</label>
-    <input type="text" id="newAuthor" class="input-el" placeholder="匿名臺大人" />
+    <input type="text" id="newAuthor" class="input-el" placeholder="匿名台大人" />
     <button class="btn-big btn-rate" style="margin-top:12px;" onclick="submitNewPoint(${lat}, ${lon})">送出並標記到地圖</button>
   `;
   openSheet("參與式新增遺漏廁所", html);
@@ -1610,9 +1625,9 @@ function submitNewPoint(lat, lon) {
   const floor = document.getElementById("newFloor")?.value || "1F";
   const floorGrp = getFloorGroup(floor) || "一樓";
   const description = document.getElementById("newDesc").value.trim();
-  const author = document.getElementById("newAuthor").value.trim() || "匿名臺大人";
+  const author = document.getElementById("newAuthor").value.trim() || "匿名台大人";
   const photo_data = pickedPhotos.newpt || "";
-  const photo_source = photo_data ? (author !== "匿名臺大人" ? `${author} 實拍` : "臺大師生實拍") : "";
+  const photo_source = photo_data ? author : "";
   const fid = "vgi_" + Date.now();
 
   const newFeat = {
