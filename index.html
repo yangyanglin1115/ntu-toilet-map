@@ -213,8 +213,21 @@
   }
   .gps-fab:active { transform: scale(0.93); }
 
-  /* Pulsing Blue User Location Dot */
+  /* Pulsing Blue User Location Dot + Compass Heading Cone */
   .user-dot-wrap { position: relative; width: 20px; height: 20px; }
+  .user-heading-cone {
+    position: absolute; left: 50%; top: 50%;
+    width: 56px; height: 56px; margin-left: -28px; margin-top: -28px;
+    pointer-events: none; display: none;
+    transition: transform 0.12s linear;
+  }
+  .user-heading-cone::before {
+    content: ""; position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+    border-radius: 50%;
+    background: conic-gradient(from -32deg at 50% 50%, rgba(37, 99, 235, 0.42) 0deg, rgba(37, 99, 235, 0.42) 64deg, transparent 64deg);
+    -webkit-mask-image: radial-gradient(circle, transparent 18%, black 22%, transparent 98%);
+    mask-image: radial-gradient(circle, transparent 18%, black 22%, transparent 98%);
+  }
   .user-dot-pulse {
     position: absolute; inset: -6px; border-radius: 50%;
     background: rgba(37, 99, 235, 0.28);
@@ -1492,10 +1505,50 @@ let hasCenteredOnGps = false;
 
 const userDotIcon = L.divIcon({
   className: "",
-  html: '<div class="user-dot-wrap"><div class="user-dot-pulse"></div><div class="user-dot-core"></div></div>',
+  html: '<div class="user-dot-wrap"><div class="user-heading-cone" id="userHeadingCone"></div><div class="user-dot-pulse"></div><div class="user-dot-core"></div></div>',
   iconSize: [20, 20],
   iconAnchor: [10, 10]
 });
+
+// 手機電子羅盤朝向光束（純 CSS GPU 旋轉，零地圖負載；支援 iOS webkitCompassHeading 與 Android deviceorientationabsolute）
+let compassActive = false;
+let lastHeadingDeg = null;
+function applyHeadingCone(deg) {
+  if (typeof deg !== "number" || isNaN(deg)) return;
+  const norm = ((deg % 360) + 360) % 360;
+  lastHeadingDeg = norm;
+  const el = document.getElementById("userHeadingCone");
+  if (el) {
+    el.style.display = "block";
+    el.style.transform = `rotate(${Math.round(norm)}deg)`;
+  }
+}
+function handleCompassEvent(ev) {
+  let heading = null;
+  if (typeof ev.webkitCompassHeading === "number" && !isNaN(ev.webkitCompassHeading)) {
+    heading = ev.webkitCompassHeading;
+  } else if (ev.absolute && typeof ev.alpha === "number") {
+    heading = 360 - ev.alpha;
+  }
+  if (heading !== null) applyHeadingCone(heading);
+}
+function startCompassListener() {
+  if (compassActive || typeof window === "undefined") return;
+  if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
+    DeviceOrientationEvent.requestPermission().then(state => {
+      if (state === "granted") {
+        compassActive = true;
+        window.addEventListener("deviceorientation", handleCompassEvent, true);
+      }
+    }).catch(() => {});
+  } else if ("ondeviceorientationabsolute" in window) {
+    compassActive = true;
+    window.addEventListener("deviceorientationabsolute", handleCompassEvent, true);
+  } else if ("ondeviceorientation" in window) {
+    compassActive = true;
+    window.addEventListener("deviceorientation", handleCompassEvent, true);
+  }
+}
 
 function updateUserLocationOnMap(lat, lon, accuracy, flyToUser = false) {
   lastUserPos = { lat, lon, accuracy };
@@ -1523,11 +1576,13 @@ function updateUserLocationOnMap(lat, lon, accuracy, flyToUser = false) {
   if (flyToUser) {
     map.flyTo([lat, lon], Math.max(map.getZoom(), 17));
   }
+  if (lastHeadingDeg !== null) applyHeadingCone(lastHeadingDeg);
   return true;
 }
 
 function toggleGpsTracking() {
   if (!navigator.geolocation) { showToast("此瀏覽器不支援 GPS 定位"); return; }
+  startCompassListener();
   const fab = document.getElementById("gpsFab");
 
   if (gpsWatchId !== null) {
@@ -1549,10 +1604,11 @@ function toggleGpsTracking() {
 
   gpsWatchId = navigator.geolocation.watchPosition(
     (pos) => {
-      const { latitude, longitude, accuracy } = pos.coords;
+      const { latitude, longitude, accuracy, heading } = pos.coords;
       const shouldFly = !hasCenteredOnGps;
       hasCenteredOnGps = true;
       updateUserLocationOnMap(latitude, longitude, accuracy, shouldFly);
+      if (lastHeadingDeg === null && typeof heading === "number" && !isNaN(heading)) applyHeadingCone(heading);
     },
     (err) => {
       fab.classList.remove("tracking");
@@ -1625,6 +1681,7 @@ function renderNearbyList(uLat, uLon) {
 }
 
 function openNearbySheet() {
+  startCompassListener();
   if (lastUserPos) {
     if (isWithinMapBounds(lastUserPos.lat, lastUserPos.lon)) {
       map.flyTo([lastUserPos.lat, lastUserPos.lon], 17);
